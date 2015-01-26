@@ -1,0 +1,294 @@
+'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
+'*
+'* Copyright © 2012-2013 Greenspace Information for Greater London (GiGL)
+'* 
+'* This file is part of the MapInfo tool 'DataExtractor'.
+'* 
+'* DataExtractor is free software: you can redistribute it and/or modify
+'* it under the terms of the GNU General Public License as published by
+'* the Free Software Foundation, either version 3 of the License, or
+'* (at your option) any later version.
+'* 
+'* DataExtractor is distributed in the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty of
+'* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+'* GNU General Public License for more details.
+'* 
+'* You should have received a copy of the GNU General Public License
+'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+
+Include "MapBasic.def"
+Include "Menu.def"
+Include "Icons.def"
+
+'-------------------------------------------------
+' Define the custom variable types
+'-------------------------------------------------
+Type STARTUPINFO
+	cb As Integer
+	lpReserved As String
+	lpDesktop As String
+	lpTitle As String
+	dwX As Integer
+	dwY As Integer
+	dwXSize As Integer
+	dwYSize As Integer
+	dwXCountChars As Integer
+	dwYCountChars As Integer
+	dwFillAttribute As Integer
+	dwFlags As Integer
+	wShowWindow As Smallint
+	cbReserved2 As Smallint
+	lpReserved2 As Integer
+	hStdInput As Integer
+	hStdOutput As Integer
+	hStdError As Integer
+End Type
+
+Type PROCESS_INFORMATION
+	hProcess As Integer
+	hThread As Integer
+	dwProcessID As Integer
+	dwThreadID As Integer
+End Type
+
+'-------------------------------------------------
+' Define the custom keywords
+'-------------------------------------------------
+Define NORMAL_PRIORITY_CLASS &H20
+Define INFINITE -1
+Define STRING_LEN 1024
+Define MIXmlDocument Integer
+Define MIXmlNode Integer
+Define MIXmlNodeList Integer
+Define MIXmlNamedNodeMap Integer
+Define MIXMLSchemaCollection Integer
+Define MIXML_LIB_NAME "GmlXlat.dll"
+Define MIWEBSERVICES_LIB_NAME "GmlXlat.dll"
+
+'-------------------------------------------------
+' Declare the subroutines
+'-------------------------------------------------
+Declare Sub Main
+Declare Sub GetDefaultValues
+Declare Sub OpenDialog
+Declare Sub DialogSetup
+Declare Sub PartnerList_Handler
+Declare Sub CheckSelection
+Declare Sub SelectSpecies
+	(ByVal nConn As Integer,
+	sPartnerName As String,
+	sShortName As String,
+	sFormat As String,
+	sExport As String,
+	sFiles As String,
+	sTableName As String)
+Declare Sub SetSymbology
+	(sNodeName As String,
+	sTableName As String,
+	sShortName As String)
+Declare Sub SelectMaps
+	(sPartnerName As String,
+	sShortName As String,
+	sFormat As String,
+	sExport As String,
+	sFiles As String,
+	sNodeName as String,
+	sTableName As String,
+	sMapStmt As String)
+Declare Sub AboutBox
+Declare Sub egsit
+Declare Sub MyPrint
+	(ByVal sMsg As String)
+Declare Sub PrintLogFile
+Declare Sub ProcessExtracts
+Declare Sub SetUTDirectory
+	(ByVal sPath as string)
+Declare Sub AmendVersion
+	(ByVal sFileName As String)
+Declare Sub TranslateToShapefile
+	(sDefaultPath As String,
+	sLocalPath As String,
+	sLocalName As String,
+	sShortName As String)
+
+Declare Sub MIXmlDocumentDestroy Lib MIXML_LIB_NAME
+	Alias "MIXmlDocumentDestroy" (
+	ByVal hXMLDocument As MIXmlDocument)
+Declare Sub MIXmlNodeDestroy Lib MIXML_LIB_NAME
+	Alias "MIXmlNodeDestroy" (
+	ByVal hXMLNode As MIXmlNode)
+Declare Sub MIXmlNodeListDestroy Lib MIXML_LIB_NAME Alias "MIXmlNodeListDestroy" (
+	ByVal hXMLNodeList As MIXmlNodeList)
+Declare Sub MIXmlAttributeListDestroy Lib MIXML_LIB_NAME Alias "MIXmlAttributeListDestroy" (
+	ByVal hXMLAttributeList As MIXmlNamedNodeMap)
+
+'-------------------------------------------------
+' Declare the functions
+'-------------------------------------------------
+Declare Function TableIsOpen
+	(ByVal sTabName As String) As Logical
+Declare Function ExecuteAndWait
+	(ByVal cmdLine as string) As Integer
+Declare Function ZipFiles
+	(sDefaultPath As String,
+	sShortName As String) As Integer
+Declare Function GetSingleNodeValue(
+	ByVal hRoot As MIXmlNode,
+	ByVal strPattern As String) As String
+Declare Function GetNodeName(
+	ByVal hNode As MIXmlNode) As String
+Declare Function GetNodeAttribute(
+	ByVal hNode As MIXmlNode) As String
+
+Declare Function CreateDirectory Lib "kernel32"
+	Alias "CreateDirectoryA"
+	(ByVal sPathName as String,
+	iSecurityAttributes as Integer) As Integer
+Declare Function SetCurrentDirectory Lib "kernel32"
+	Alias "SetCurrentDirectoryA"
+	(lpBuffer As String) As Integer
+Declare Function MoveFile Lib "kernel32" Alias "MoveFileA"
+	(byval lpExistingFileName as string,
+	byval lpNewFileName as string) As Integer
+Declare Function CloseHandle Lib "kernel32"
+	(hObject As Integer) As smallint
+Declare Function WaitForSingleObject Lib "kernel32"
+	(ByVal hHandle As Integer,
+	ByVal dwMilliseconds As Integer) As Integer
+Declare Function GetExitCodeProcess Lib "kernel32"
+	(ByVal hProcess As Integer,
+	lpExitCode As Integer) As Integer
+Declare Function STLText2Symbol
+	(ByVal sSymbol As String) As Symbol
+Declare Function STLText2Pen
+	(ByVal sSymbol As String) As Pen
+Declare Function STLText2Brush
+	(ByVal sSymbol As String) As Brush
+Declare Function StringSplit
+	(ByVal sText As String,
+	ByVal sSplitChar As String,
+	arrParts() As String) As Integer
+
+Declare Function CreateProcessA Lib "kernel32"
+	(ByVal lpApplicationName As Integer,
+	ByVal lpCommandLine As String,
+	ByVal lpProcessAttributes As Integer,
+	ByVal lpThreadAttributes As Integer,
+	ByVal bInheritHandles As Integer,
+	ByVal dwCreationFlags As Integer,
+	ByVal lpEnvironment As Integer,
+	ByVal lpCurrentDirectory As Integer,
+	lpStartupInfo As STARTUPINFO,
+	lpProcessInformation As PROCESS_INFORMATION) As Integer
+Declare Function MIXmlDocumentCreate Lib MIXML_LIB_NAME
+	Alias "MIXmlDocumentCreate" () As MIXmlDocument
+Declare Function MIXmlDocumentLoad Lib MIXML_LIB_NAME
+	Alias "MIXmlDocumentLoad" (
+	ByVal hXMLDocument As MIXmlDocument,
+	ByVal strPath As String,
+	pbParsingError As SmallInt,
+	ByVal bValidate As SmallInt,
+	ByVal bResolveExternals As SmallInt)
+	As SmallInt
+Declare Function MIXmlDocumentGetRootNode Lib MIXML_LIB_NAME
+	Alias "MIXmlDocumentGetRootNode" (
+	ByVal hXMLDocument As MIXmlDocument)
+	As MIXmlNode
+Declare Function MIXmlSelectSingleNode Lib MIXML_LIB_NAME
+	Alias "MIXmlSelectSingleNode" (
+	ByVal hXMLNode As MIXmlNode,
+	ByVal strPattern As String)
+	As MIXmlNode
+Declare Function MIXmlGetChildList Lib MIXML_LIB_NAME Alias "MIXmlGetChildList" (
+	ByVal hXMLNode As MIXmlNode)
+	As MIXmlNodeList
+Declare Function MIXmlGetNextNode Lib MIXML_LIB_NAME Alias "MIXmlGetNextNode" (
+	ByVal hXMLNodeList As MIXmlNodeList)
+	As MIXmlNode
+Declare Function MIXmlGetAttributeList Lib MIXML_LIB_NAME Alias "MIXmlGetAttributeList" (
+	ByVal hXMLNode As MIXmlNode)
+	As MIXmlNamedNodeMap
+Declare Function MIXmlGetNextAttribute Lib MIXML_LIB_NAME Alias "MIXmlGetNextAttribute" (
+	ByVal hXMLAttributeList As MIXmlNamedNodeMap)
+	As MIXmlNode
+Declare Function MIXmlNodeGetName Lib MIXML_LIB_NAME Alias "MIXmlNodeGetName" (
+	ByVal hXMLNode As MIXmlNode,
+	pName As String,
+	ByVal nLen As Integer)
+	As SmallInt
+Declare Function MIXmlNodeGetValue Lib MIXML_LIB_NAME Alias "MIXmlNodeGetValue" (
+	ByVal hXMLNode As MIXmlNode,
+	pValue As String,
+	ByVal nLen As Integer)
+	As SmallInt
+Declare Function MIGetErrorMessage Lib MIWEBSERVICES_LIB_NAME
+	Alias "MIGetErrorMessage" () As String
+Declare Function MIGetErrorCode Lib MIWEBSERVICES_LIB_NAME
+	Alias "MIGetErrorCode" () As Integer
+
+'-------------------------------------------------
+' Declare the global variables
+'-------------------------------------------------
+Global sDefaultPath As String
+Global sFileDSN As String
+Global sDefaultSchema As String
+Global sTableListSQL As String
+Global sPartnerTable As String
+Global sPartnerColumn As String
+Global sShortColumn As String
+Global sNotesColumn As String
+Global sActiveColumn As String
+Global sFormatColumn As String
+Global sExportColumn As String
+Global sFilesColumn As String
+Global sPartnerListSQL As String
+Global sLogFileName As String
+
+Global aPartners(199) As String
+Global aShorts(199) As String
+Global aNotes(199) As String
+Global aFormats(199) As String
+Global aExports(199) As String
+Global aFiles(199) As String
+
+Global aSQLTables(99) As String
+'Global aSppNodes(99) As String
+'Global aSppTables(99) As String
+Global aMapNodes(99) As String
+Global aMapTables(99) As String
+Global aMapStmts(99) As String
+
+Global aFileSppNodes(99) As String
+Global aFileSppTables(99) As String
+Global aFileSppStmts(99) As String
+Global aFileSppClauses(99) As String
+Global aFileMapNodes(99) As String
+Global aFileMapTables(99) As String
+Global aFileMapStmts(99) As String
+
+Global aNodeSelected(999) As String
+Global aTableSelected(999) As String
+Global aTableTypeSelected(999) As String
+Global aPartnerSelected(999) As String
+Global aShortSelected(999) As String
+Global aFormatSelected(999) As String
+Global aExportSelected(999) As String
+Global aFilesSelected(999) As String
+Global aMapStmtSelected(999) As String
+
+Global iExtractTot As Integer
+Global iExtractCnt As Integer
+Global iPartner As Integer
+Global iSppTable As Integer
+Global iMapTable As Integer
+Global nConn As Integer
+Global iRecMax As Integer
+Global sZipDefault As String
+Global bZipFiles As Logical
+Global sConfidentialDefault As String
+Global bConfidentialSurveys As Logical
+Global sConfidentialClause As String
+Global bClearLog As Logical
+Global sLastShortName As String

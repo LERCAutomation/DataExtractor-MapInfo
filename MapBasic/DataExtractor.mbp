@@ -1,0 +1,6 @@
+[Link]
+Application=DataExtractor.mbx
+Module=DataExtractor.mbo
+Module=GenFunctions.mbo
+Module=TranslateToSHP.mbo
+Module=XMLFunctions.mbo

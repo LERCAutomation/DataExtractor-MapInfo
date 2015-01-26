@@ -1,0 +1,214 @@
+'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
+'*
+'* Copyright © 2013 Greenspace Information for Greater London (GiGL)
+'* 
+'* This file is part of the MapInfo tool 'DataExtractor'.
+'* 
+'* DataExtractor is free software: you can redistribute it and/or modify
+'* it under the terms of the GNU General Public License as published by
+'* the Free Software Foundation, either version 3 of the License, or
+'* (at your option) any later version.
+'* 
+'* DataExtractor is distributed in the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty of
+'* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+'* GNU General Public License for more details.
+'* 
+'* You should have received a copy of the GNU General Public License
+'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'*
+'***************************************************************
+'* TranslateToSHP v1.4
+'*
+'* Contains functions to translate MapInfo .tab files into
+'* ESRI .shp files.
+'*
+'*
+'* Created:			Andy Foy - February 2013
+'* Last revised:	Andy Foy - April 2013
+'***************************************************************
+Include "DataExtractor.def"
+
+Sub TranslateToShapefile(sDefaultPath As String, sLocalPath As String, sLocalName As String, sShortName As String)
+'*************************************************
+'* Routine to translate a MapInfo table name
+'* passed in the call into an ESRI shapefile
+'*************************************************
+
+	Call MyPrint("Translating to a SHP ...")
+	
+	'-------------------------------------------------
+	' Set the current directory to the Universal Translator directory
+	' (assumimg you're running from IMUT.exe Directory)
+	'-------------------------------------------------
+	Call SetUTDirectory(ProgramDirectory$()+ "UT\")
+	
+	Dim sInputFile as string
+	Dim sMappingFile as string
+	Dim sResultDir as string
+	Dim sLogFile as string
+	
+	sInputFile = sLocalPath + "\" + sLocalName + ".TAB"
+	sResultDir = sLocalPath
+	sMappingFile = sDefaultPath + "\" + sLocalName + ".fme"
+	sLogFile = sDefaultPath + "\" + sLocalName + "_MUT.log"
+	Call AmendVersion(sInputFile)
+	
+	'-------------------------------------------------
+	' Create the mapping file command string
+	'-------------------------------------------------
+	Dim sMUTGenerate as string
+	sMUTGenerate = "Fme.exe GENERATE MAPINFO SHAPE " +
+		chr$(34) + sInputFile + chr$(34) + " " +
+		chr$(34) + sMappingFile + chr$(34) +
+		" --SourceSourceDataset " + 
+		chr$(34) + sInputFile + chr$(34) + " " +
+		" --DestDestDataset " + 
+		chr$(34) + sResultDir + chr$(34) + " " +
+		" LOG_STANDARDOUT YES" +
+		" LOG_FILENAME " + Chr$(34) + sLogFile + chr$(34) +
+		" LOG_APPEND NO"
+
+	'-------------------------------------------------
+	' Execute the command and wait for it to finish
+	'-------------------------------------------------
+	If ExecuteAndWait(sMUTGenerate) > 0 then
+		Call MyPrint("Error creating Mapping file - process terminated.")
+		Call MyPrint("")
+		Exit Sub
+	End if
+
+	'-------------------------------------------------
+	' Create the String command to run the Mapping
+	' file through the Universal Translator
+	'-------------------------------------------------
+	Dim sMUTRunCmd as string
+	sMUTRunCmd = "Fme.exe " + chr$(34) + sMappingFile + chr$(34)+
+		" --HOMOGENOUS_GEOMETRY Yes" +
+		" --_SHAPE_FILE_TYPE 2d" +
+		" --SourceDataset " + chr$(34) + sInputFile + chr$(34) +
+		" --DestDataset " + Chr$(34) + sResultDir + chr$(34) +
+		" --_EXTENSION TAB" + 
+		" --_BASENAME " + sLocalName +
+		" --_FULLBASENAME " + sLocalName
+
+	'-------------------------------------------------
+	' Check to see if the Mapping file was created
+	' before running the translation
+	'-------------------------------------------------
+	if FileExists(sMappingFile) then
+		'-------------------------------------------------
+		' Execute the command and wait for it to finish
+		'-------------------------------------------------
+		If ExecuteAndWait(sMUTRunCmd) > 0 then
+			Call MyPrint("Error translating to SHP file - process terminated.")
+			Call MyPrint("")
+			Exit Sub
+		End if
+	Else
+		Call MyPrint("Mapping file cound not be found - process terminated.")
+		Call MyPrint("")
+		Exit Sub
+	End if
+
+End Sub
+
+Sub SetUTDirectory(ByVal sPath as string)
+'***************************************************************
+'* Set the current directory to the path passed to
+'* the subroutine
+'***************************************************************
+
+	OnError Goto ErrorHandle
+
+	'-------------------------------------------------
+	' Set the current directory to the required path
+	'-------------------------------------------------
+	Dim is_Return As SmallInt
+	is_Return = SetCurrentDirectory(sPath)
+
+	'-------------------------------------------------
+	' If the path was invalid, or the set directory
+	' didn't work then warn the user
+	'-------------------------------------------------
+	If Not is_Return Then
+		Note "Error setting Universal Translator directory. Path sent was: " + sPath
+		Call MyPrint("Error setting Universal Translator directory. Path sent was: " + sPath)
+		Exit Sub
+	End If
+
+	Exit Sub
+
+ErrorHandle:
+	Note str$(Err()) + ": " + Error$()
+	Call MyPrint(str$(Err()) + ": " + Error$())
+	Resume Next
+End Sub
+
+Sub AmendVersion(ByVal sFileName As String)
+'***************************************************************
+'* Amend the version number of the MapInfo tab file passed to
+'* the subroutine so that the Universal Translator (which is
+'* an older version) will process it
+'***************************************************************
+
+Dim sBuf As String
+Dim aTemp(999) As String
+Dim iTemp As Integer
+
+	'-------------------------------------------------
+	' Open the file for input
+	'-------------------------------------------------
+	Open File sFileName For Input As #1
+
+	'-------------------------------------------------
+	' Store the input file line by line in an array
+	'-------------------------------------------------
+	Line Input #1, sBuf
+	iTemp = 0
+	Do Until EOF(1)
+		'-------------------------------------------------
+		' Replace the version number (when found)
+		'-------------------------------------------------
+		If sBuf = "!version 1000" Then
+			iTemp = iTemp + 1
+			aTemp(iTemp) = "!version 900"
+		Else
+			'-------------------------------------------------
+			' Stop when the begin_metadata statement is found
+			'-------------------------------------------------
+			If sBuf = "begin_metadata" Then
+				Exit Do
+			Else
+				iTemp = iTemp + 1
+				aTemp(iTemp) = sBuf
+			End If
+		End If
+		Line Input #1, sBuf
+	Loop
+
+	'-------------------------------------------------
+	' Close the input file
+	'-------------------------------------------------
+	Close File #1
+
+	'-------------------------------------------------
+	' Open the file for output
+	'-------------------------------------------------
+	Open File sFileName For Output As #2
+
+	'-------------------------------------------------
+	' Write the array contents to the output file
+	'-------------------------------------------------
+	Dim iTemp2 As Integer
+	For iTemp2 = 1 to iTemp
+		Print #2, aTemp(iTemp2)
+	Next
+
+	'-------------------------------------------------
+	' Close the output file
+	'-------------------------------------------------
+	Close File #2
+
+End Sub

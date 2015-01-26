@@ -1,0 +1,1634 @@
+'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
+'*
+'* Copyright © 2012-2013 Greenspace Information for Greater London (GiGL)
+'* 
+'* This file is part of the MapInfo tool 'DataExtractor'.
+'* 
+'* DataExtractor is free software: you can redistribute it and/or modify
+'* it under the terms of the GNU General Public License as published by
+'* the Free Software Foundation, either version 3 of the License, or
+'* (at your option) any later version.
+'* 
+'* DataExtractor is distributed in the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty of
+'* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+'* GNU General Public License for more details.
+'* 
+'* You should have received a copy of the GNU General Public License
+'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'*
+'***************************************************************
+'* DataExtractor v1.51
+'*
+'* Creates a dialog window which lists the partners in the
+'* partner GIS table and also the SQL species tables and
+'* MapInfo habitat tables and allows the user to select
+'* which partners and which tables to process.
+'*
+'*
+'* Created:			Andy Foy - November 2012
+'* Last revised:	Andy Foy - September 2013
+'***************************************************************
+Include "DataExtractor.def"
+
+Sub Main
+'***************************************************************
+'* Main sub-routine
+'***************************************************************
+
+	'-------------------------------------------------
+	' Create a new menu
+	'-------------------------------------------------
+	Create Menu "&Data Extractor" As
+	   "&Run Data Extractor ..." Calling OpenDialog,
+	   "(-",
+	   "&About Data Extractor ..." Calling AboutBox,
+	   "E&xit Data Extractor" Calling egsit
+
+	'-------------------------------------------------
+	' Add the new menu item to the Tools menu
+	'-------------------------------------------------
+	Alter Menu "Tools" Add
+		"Data Extractor" As "Data Extractor"
+
+	Exit Sub
+
+End Sub
+
+Sub GetDefaultValues
+'***************************************************************
+'* Retrieve all the default values from the config file
+'* which is a XML document
+'***************************************************************
+
+	Dim bParseError As SmallInt
+	Dim hXMLDoc As MIXmlDocument
+	Dim hXMLRoot As MIXmlNode
+	Dim hXMLNode As MIXmlNode
+	Dim hXMLFilesNodeList As MIXMLNodeList
+	Dim hXMLFilesNodeParent As MIXmlNode
+	Dim hXMLFilesNode As MIXmlNode
+
+	OnError Goto GetVariablesError
+
+	'-------------------------------------------------
+	' Create a document handle
+	'-------------------------------------------------
+	hXMLDoc = MIXmlDocumentCreate()
+	If hXMLDoc Then
+
+		'-------------------------------------------------
+		' Load the document into the document handle
+		'-------------------------------------------------
+		Dim iXMLLoad As SmallInt
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		if iXMLLoad > 0 Then
+
+			'-------------------------------------------------
+			' Get a handle on the XML root node of the document
+			'-------------------------------------------------
+			hXMLRoot = MIXmlDocumentGetRootNode(hXMLDoc)
+			If hXMLRoot Then
+
+				'-------------------------------------------------
+				' Get a handle on the DataExtractor node
+				'-------------------------------------------------
+				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
+	          If hXMLNode Then
+	
+					'-------------------------------------------------
+					' Load the default values from the child nodes
+					' under the DataExtractor node
+					'-------------------------------------------------
+					' Log file for storing output messages
+					sLogFileName = GetSingleNodeValue(hXMLNode, "LogFileName")
+
+					' File DSN path and name containing remote SQL database connection settings
+					sFileDSN = GetSingleNodeValue(hXMLNode, "FileDSN")
+
+					' Default file path to store extracts in sub-folders
+					sDefaultPath = GetSingleNodeValue(hXMLNode, "DefaultPath")
+
+					' Default database schema to use in the remote SQL database
+					sDefaultSchema = GetSingleNodeValue(hXMLNode, "DatabaseSchema")
+
+					' Name of partner table in the remote SQL database
+					sPartnerTable = GetSingleNodeValue(hXMLNode, "PartnerTable")
+
+					' Name of column of partner names in the partner table
+					sPartnerColumn = GetSingleNodeValue(hXMLNode, "PartnerColumn")
+
+					' Name of column of partner abbreviations in the partner table
+					sShortColumn = GetSingleNodeValue(hXMLNode, "ShortColumn")
+
+					' Name of column of partner notes in the partner table
+					sNotesColumn = GetSingleNodeValue(hXMLNode, "NotesColumn")
+
+					' Name of column of active partner flag in the partner table
+					sActiveColumn = GetSingleNodeValue(hXMLNode, "ActiveColumn")
+
+					' Name of column of GIS format in the partner table
+					sFormatColumn = GetSingleNodeValue(hXMLNode, "FormatColumn")
+
+					' Name of column of Export to CSV flag in the partner table
+					sExportColumn = GetSingleNodeValue(hXMLNode, "ExportColumn")
+
+					' Name of column of Files list in the partner table
+					sFilesColumn = GetSingleNodeValue(hXMLNode, "FilesColumn")
+
+					' SQL used to list the names of species tables in the remote SQL database
+					sTableListSQL = GetSingleNodeValue(hXMLNode, "TableListSQL")
+
+					' Maximum number of records to be downloaded at one time
+					iRecMax = GetSingleNodeValue(hXMLNode, "RecMax")
+
+					' Default setting for zipping extract files
+					sZipDefault = GetSingleNodeValue(hXMLNode, "ZipDefault")
+
+					' Default setting for extracting confidential surveys
+					sConfidentialDefault = GetSingleNodeValue(hXMLNode, "ConfidentialDefault")
+
+					' SQL clause for excluding confidential surveys
+					sConfidentialClause = GetSingleNodeValue(hXMLNode, "ConfidentialClause")
+
+					'-------------------------------------------------
+					' Get a handle on the SpeciesTables node
+					'-------------------------------------------------
+					hXMLFilesNodeParent = MIXmlSelectSingleNode(hXMLNode, "SpeciesTables")
+
+					'-------------------------------------------------
+					' Get a handle on the node map of the above node
+					'-------------------------------------------------
+					hXMLFilesNodeList = MIXMLGetChildList(hXMLFilesNodeParent)
+
+					'-------------------------------------------------
+					' Get a handle on the first attribute in the node list
+					'-------------------------------------------------
+					hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
+
+					'-------------------------------------------------
+					' Loop through all the attributes in the node list
+					' storing the columns and SQL clauses in arrays
+					'-------------------------------------------------
+					Dim i As Integer
+					i = 0
+					Do while hXMLFilesNode
+						
+						i = i + 1
+						Redim aFileSppNodes(i)
+						Redim aFileSppStmts(i)
+						Redim aFileSppClauses(i)
+
+						' Name of the Species node
+						aFileSppNodes(i) = GetNodeName(hXMLFilesNode)
+
+						' Name of the MapInfo table to be created
+						aFileSppTables(i) = GetSingleNodeValue(hXMLFilesNode, "TableName")
+
+						' SQL statement used to retrieve the required columns from the temporary species table
+						aFileSppStmts(i) = GetSingleNodeValue(hXMLFilesNode, "Columns")
+
+						' SQL clause used to retrieve the required rows from the temporary species table
+						aFileSppClauses(i) = GetSingleNodeValue(hXMLFilesNode, "Clauses")
+
+						'-------------------------------------------------
+						' Get a handle on the next attribute in the node list
+						'-------------------------------------------------
+						hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
+					Loop
+
+					'-------------------------------------------------
+					' Get a handle on the MapTables node
+					'-------------------------------------------------
+					hXMLFilesNodeParent = MIXmlSelectSingleNode(hXMLNode, "MapTables")
+
+					'-------------------------------------------------
+					' Get a handle on the node map of the above node
+					'-------------------------------------------------
+					hXMLFilesNodeList = MIXMLGetChildList(hXMLFilesNodeParent)
+
+					'-------------------------------------------------
+					' Get a handle on the first attribute in the node list
+					'-------------------------------------------------
+					hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
+
+					'-------------------------------------------------
+					' Loop through all the attributes in the node list
+					' storing the table names and columns and in arrays
+					'-------------------------------------------------
+					i = 0
+					Do while hXMLFilesNode
+						
+						i = i + 1
+						Redim aFileMapNodes(i)
+						Redim aFileMapTables(i)
+						Redim aFileMapStmts(i)
+
+						' Name of the Map node
+						aFileMapNodes(i) = GetNodeName(hXMLFilesNode)
+
+						' Name of the MapInfo input and output Map table
+						aFileMapTables(i) = GetSingleNodeValue(hXMLFilesNode, "TableName")
+
+						' SQL statement used to retrieve the required rows from the loaded map table
+						aFileMapStmts(i) = GetSingleNodeValue(hXMLFilesNode, "Columns")
+
+						'-------------------------------------------------
+						' Get a handle on the next attribute in the node list
+						'-------------------------------------------------
+						hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
+					Loop
+
+				End If
+
+			End If
+
+		Else
+
+			Note "Error : " + MIGetErrorMessage()
+
+		End If
+
+	End If
+
+	'-------------------------------------------------
+	' Build the SQL used to list the partner names
+	' from the partner table in the remote SQL database
+	'-------------------------------------------------
+	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sFilesColumn +
+		" From " + sDefaultSchema + "." + sPartnerTable +
+		" Where " + sActiveColumn + " = 'Y' Or " + sActiveColumn + " = 'y'" + 
+		" Order By " + sPartnerColumn
+
+CleanUp:
+	'-------------------------------------------------
+	' Destroy the handles
+	'-------------------------------------------------
+	If hXMLFilesNode Then Call MIXmlNodeDestroy(hXMLFilesNode) End If
+	If hXMLFilesNodeList Then Call MIXmlNodeListDestroy(hXMLFilesNodeList) End If
+	If hXMLFilesNodeParent Then Call MIXmlNodeDestroy(hXMLFilesNodeParent) End If
+	If hXMLNode Then Call MIXmlNodeDestroy(hXMLNode) End If
+	If hXMLRoot Then Call MIXmlNodeDestroy(hXMLRoot) End If
+	If hXMLDoc Then Call MIXmlDocumentDestroy(hXMLDoc) End If
+
+	Exit Sub
+
+GetVariablesError:
+	Note str$(Err()) + ": " + Error$()
+	Exit Sub
+
+End Sub
+
+Sub OpenDialog
+'***************************************************************
+'* Create the user dialog window
+'***************************************************************
+
+	'-------------------------------------------------
+	' Trap errors
+	'-------------------------------------------------
+    OnError Goto ErrorTrap
+
+	'-------------------------------------------------
+	' Retrieve the default values from the config file
+	'-------------------------------------------------
+	Call GetDefaultValues
+
+	'-------------------------------------------------
+	' Build a new dialog window
+	'-------------------------------------------------
+	Dialog
+		Title "Data Extractor" Calling DialogSetup
+		Width 300
+		Height 220
+		Position 50, 70
+
+	'-------------------------------------------------
+	' Add a partner listbox
+	'-------------------------------------------------
+	Control StaticText Title "Active Partners:"
+		Position 10, 10
+	Control MultiListBox
+		ID 1
+		Title ""
+		Position 10, 20
+		Height 150
+		Width 170
+		Calling PartnerList_Handler
+
+	'-------------------------------------------------
+	' Add a SQL species table listbox
+	'-------------------------------------------------
+	Control StaticText Title "SQL Species Tables:"
+		Position 190,10
+	Control MultiListBox
+		ID 2
+		Title ""
+		Position 190, 20
+		Height 60
+		Width 100
+
+	'-------------------------------------------------
+	' Add a MapInfo table listbox
+	'-------------------------------------------------
+	Control StaticText Title "MapInfo Tables:"
+		Position 190,100
+	Control MultiListBox
+		ID 3
+		Title ""
+		Position 190, 110
+		Height 60
+		Width 100
+
+	'-------------------------------------------------
+	' Add a checkbox for zipping the extract files
+	'-------------------------------------------------
+	Control CheckBox
+		ID 4
+		Title "Zip extract files?"
+		Position 10,180
+		Value FALSE
+		Into bZipFiles
+
+	'-------------------------------------------------
+	' Add a checkbox for extract confidential surveys
+	'-------------------------------------------------
+	Control CheckBox
+		ID 5
+		Title "Extract confidential surveys?"
+		Position 105,180
+		Value FALSE
+		Into bConfidentialSurveys
+
+	'-------------------------------------------------
+	' Add a checkbox for clearing the log file
+	'-------------------------------------------------
+	Control CheckBox
+		ID 6
+		Title "Clear log file?"
+		Position 235,180
+		Value TRUE
+		Into bClearLog
+
+	'-------------------------------------------------
+	' Add Ok and cancel buttons
+	'-------------------------------------------------
+	Control CancelButton
+		Position 205,200
+		Width 40
+	Control OKButton
+		Position 250,200
+		Width 40
+		Calling CheckSelection
+
+	If CommandInfo(CMD_INFO_DLG_OK) And
+		iExtractTot > 0 Then
+
+		'-------------------------------------------------
+		' Clear the log file
+		'-------------------------------------------------
+		If bClearLog = True Then
+			If FileExists(sLogFileName) Then
+				Kill sLogFileName
+			End If
+		End If
+
+		'-------------------------------------------------
+		' Reset the global variables
+		'-------------------------------------------------
+		sLastShortName = ""
+
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("Process started!")
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("")
+
+		'-------------------------------------------------
+		' Process the selections one by one
+		'-------------------------------------------------
+		iExtractCnt = 1
+		ProgressBar "Processing " + iExtractTot + " data extracts ..."
+			Calling ProcessExtracts
+			Range iExtractTot
+
+		Dim lResponse As Logical
+		If CommandInfo(CMD_INFO_STATUS) Then
+			Call MyPrint("----------------------------------------------------------------------")
+			Call MyPrint("Process completed!")
+			Call MyPrint("----------------------------------------------------------------------")
+			lResponse = Ask("Processing complete!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
+		Else
+			Call MyPrint("----------------------------------------------------------------------")
+			Call MyPrint("Process interrupted by user!")
+			Call MyPrint("----------------------------------------------------------------------")
+			lResponse = Ask("Processing interrupted!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
+		End If
+
+		'-------------------------------------------------
+		' Ask the user if they want to see the log file
+		'-------------------------------------------------
+		If lResponse = True Then
+			'-------------------------------------------------
+			' Open the Message window and clear it
+			'-------------------------------------------------
+			Close Window Message
+			Open Window Message
+			Set Window Message
+				Position (7,4)
+				Width 6
+				Height 5
+			Print(chr$(12))
+
+			'-------------------------------------------------
+			' Display the log file in the message window
+			'-------------------------------------------------
+			Call PrintLogFile
+
+		End If
+
+		'-------------------------------------------------
+		' Disconnect the connection to the SQL Server database
+		'-------------------------------------------------
+		Server nConn Disconnect
+	End If
+
+Done:
+	Exit Sub
+	
+ErrorTrap:
+	Note str$(Err()) + ": " + Error$()
+	Call MyPrint(str$(Err()) + ": " + Error$())
+	Resume Done
+
+End Sub
+
+Sub DialogSetup
+'***************************************************************
+' Setup the dialog window listboxes
+'***************************************************************
+
+	'-------------------------------------------------
+	' Clear the Message window and close it
+	'-------------------------------------------------
+	Print(chr$(12))
+	Close Window Message
+
+	'-------------------------------------------------
+	' Trap any connection errors
+	'-------------------------------------------------
+	OnError Goto ConnectionError
+
+	'-------------------------------------------------
+	' Connect to the SQL Server database
+	'-------------------------------------------------
+	nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
+	If nConn = 0 Then
+		Note "Error: Unable to connect to SQL Server!"
+		Call egsit
+	End If 
+
+	'-------------------------------------------------
+	' No longer trap any errors
+	'-------------------------------------------------
+	OnError Goto 0
+
+	'-------------------------------------------------
+	' Query all the Partners in the boundary table
+	'-------------------------------------------------
+	Dim nStmt as Integer
+	nStmt = Server_Execute(nConn, sPartnerListSQL)
+
+	'-------------------------------------------------
+	' Bind to the columns of the results
+	'-------------------------------------------------
+	Dim sPartner, sShort, sNote, sFormat, sExport, sFiles As String
+	Dim iPartner, iShort, iNote, iFormat, iExport, iFiles As Integer
+	Server nStmt Bind Column 1 To sPartner, iPartner
+	Server nStmt Bind Column 2 To sShort, iShort
+	Server nStmt Bind Column 3 To sNote, iNote
+	Server nStmt Bind Column 4 To sFormat, iFormat
+	Server nStmt Bind Column 5 To sExport, iExport
+	Server nStmt Bind Column 6 To sFiles, iFiles
+	Server nStmt Fetch Next
+
+	'-------------------------------------------------
+	' Loop through all the partners in the partners
+	' table and add them to the Partners list
+	'-------------------------------------------------
+	Dim i as integer
+	i = 0
+	While Not Server_Eot(nStmt)
+
+		'-------------------------------------------------
+		' Concatenate all the partners into an array
+		'-------------------------------------------------
+		i = i + 1
+		Redim aPartners(i)
+		Redim aShorts(i)
+		Redim aNotes(i)
+		Redim aFormats(i)
+		Redim aExports(i)
+		aPartners(i) = sPartner
+		aShorts(i) = LTrim$(RTrim$(sShort))
+		aNotes(i) = LTrim$(RTrim$(sNote))
+		aFormats(i) = sFormat
+		aExports(i) = sExport
+		aFiles(i) = sFiles
+		Server nStmt Fetch Next
+
+	Wend
+
+	'-------------------------------------------------
+	' Close the query results
+	'-------------------------------------------------
+	Server nStmt Close
+
+	'-------------------------------------------------
+	' Update the Partner list to show the list of partners
+	'-------------------------------------------------
+	ReDim aPartners(i)
+	Alter Control 1 Title FROM Variable aPartners
+
+	'-------------------------------------------------
+	' Query all the species tables in the database
+	'-------------------------------------------------
+	nStmt = Server_Execute(nConn, sTableListSQL)
+
+	'-------------------------------------------------
+	' Bind to the 1st column of the results
+	'-------------------------------------------------
+	Dim aSQLTable As String
+	Dim iStatus As Integer
+	Server nStmt Bind Column 1 To aSQLTable, iStatus
+	Server nStmt Fetch Next
+
+	'-------------------------------------------------
+	' Loop through all the Species tables matching the
+	' SQL criteria and add them to the Species Tables list
+	'-------------------------------------------------
+	i = 1
+	While Not Server_Eot(nStmt)
+
+		'-------------------------------------------------
+		' Concatenate all the Species tables into an array
+		'-------------------------------------------------
+		Redim aSQLTables(i)
+		aSQLTables(i) = aSQLTable
+		Server nStmt Fetch Next
+		i = i + 1
+
+	Wend
+
+	'-------------------------------------------------
+	' Close the query results
+	'-------------------------------------------------
+	Server nStmt Close
+
+	'-------------------------------------------------
+	' Update the Species Table list to show the list
+	' of tables
+	'-------------------------------------------------
+	Alter Control 2 Title FROM Variable aSQLTables
+
+	'-------------------------------------------------
+	' Check the partner table is already open in
+	' MapInfo
+	'-------------------------------------------------
+	If Not TableIsOpen(sPartnerTable) Then
+		Note "Error: Table '" + sPartnerTable + "' is not open. Unable to process MapInfo tables."
+		Goto SetDefaults
+	End If
+
+	'-------------------------------------------------
+	' Loop through all the MapInfo tables listed in the
+	' config file and add them to the Map Tables list
+	' if they are open in MapInfo
+	'-------------------------------------------------
+	Dim j As Integer
+	j = 0
+	For i = 1 to UBound(aFileMapNodes)
+
+		'-------------------------------------------------
+		' Concatenate all the Map tables into an array
+		'-------------------------------------------------
+		Redim aMapNodes(i)
+		Redim aMapTables(i)
+		Redim aMapStmts(i)
+		If TableIsOpen(aFileMapTables(i)) Then
+			j = j + 1
+			aMapNodes(j) = aFileMapNodes(i)
+			aMapTables(j) = aFileMapTables(i)
+			aMapStmts(j) = aFileMapStmts(i)
+		Else
+			Note "Error: Table '" + aFileMapNodes(i) + "' is not already open as '" + aFileMapTables(i) + "'."
+		End If
+
+	Next
+
+	'-------------------------------------------------
+	' Update the Map Table list to show the list of tables
+	'-------------------------------------------------
+	Alter Control 3 Title FROM Variable aMapTables
+
+SetDefaults:
+	'-------------------------------------------------
+	' Set the default value for the zip checkbox
+	'-------------------------------------------------
+	If UCase$(sZipDefault) = "YES" OR UCase$(sZipDefault) = "Y" Then
+		Alter Control 4 Value TRUE
+	Else
+		Alter Control 4 Value FALSE
+	End If
+
+	'-------------------------------------------------
+	' Set the default value for the extract
+	' confidential surveys checkbox
+	'-------------------------------------------------
+	If UCase$(sConfidentialDefault) = "YES" OR UCase$(sConfidentialDefault) = "Y" Then
+		Alter Control 5 Value TRUE
+	Else
+		Alter Control 5 Value FALSE
+	End If
+
+Exit Sub
+
+ConnectionError:
+
+If Err() = 1333 Then
+	Note "Error: Unable to connect to SQL Server!"
+'	Call MyPrint("Error: Unable to connect to SQL Server!")
+	Call egsit
+End If
+
+End Sub
+
+Sub PartnerList_Handler
+'***************************************************************
+' Called when the Partner list box is clicked or double-clicked
+'***************************************************************
+
+	Dim iPartner as Integer
+	'-------------------------------------------------
+	' If the list is double-clicked then show the notes text
+	'-------------------------------------------------
+	If CommandInfo(CMD_INFO_DLG_DBL) Then
+		iPartner = ReadControlValue(TriggerControl())
+		If aNotes(iPartner) = "" Then
+			Note aPartners(iPartner) + " (" + aShorts(iPartner) + ") notes: " + Chr$(10) + Chr$(10) + "None"
+		Else
+			Note aPartners(iPartner) + " (" + aShorts(iPartner) + ") notes: " + Chr$(10) + Chr$(10) + "'" + aNotes(iPartner) + "'"
+		End If
+	End If
+
+End Sub
+
+Sub CheckSelection
+'***************************************************************
+'* Check the user's selections and process according
+'***************************************************************
+
+	iExtractTot = 0
+
+	'-------------------------------------------------
+	' Check if the user has selected at least one partner
+	'-------------------------------------------------
+	iPartner = ReadControlValue(1)
+	if iPartner = 0 then
+		Note "No partners have been selected!"
+		Exit Sub
+	End If
+
+	'-------------------------------------------------
+	' Check if the user has selected at least one table
+	' from either of the table lists
+	'-------------------------------------------------
+	iSppTable = ReadControlValue(2)
+	iMapTable = ReadControlValue(3)
+	if iSppTable = 0 And iMapTable = 0 then
+		Note "No tables have been selected!"
+		Exit Sub
+	End If
+
+	'-------------------------------------------------
+	' Count the number of extracts to run
+	'-------------------------------------------------
+	iExtractCnt = 0
+	Do While iPartner > 0
+		Do While iSppTable > 0
+			'-------------------------------------------------
+			' Increment the counter
+			'-------------------------------------------------
+			iExtractTot = iExtractTot + 1
+
+			aNodeSelected(iExtractTot) = ""
+			aTableSelected(iExtractTot) = aSQLTables(iSppTable)
+			aTableTypeSelected(iExtractTot) = "SQL"
+			aPartnerSelected(iExtractTot) = aPartners(iPartner)
+			aShortSelected(iExtractTot) = aShorts(iPartner)
+			aFormatSelected(iExtractTot) = aFormats(iPartner)
+			aExportSelected(iExtractTot) = aExports(iPartner)
+			aFilesSelected(iExtractTot) = aFiles(iPartner)
+
+			'-------------------------------------------------
+			' Read the next table selected in the list
+			'-------------------------------------------------
+			iSppTable = ReadControlValue(2)
+		Loop
+
+		Do While iMapTable > 0
+			'-------------------------------------------------
+			' Increment the counter
+			'-------------------------------------------------
+			iExtractTot = iExtractTot + 1
+
+			aNodeSelected(iExtractTot) = aMapNodes(iMapTable)
+			aTableSelected(iExtractTot) = aMapTables(iMapTable)
+			aTableTypeSelected(iExtractTot) = "Map"
+			aPartnerSelected(iExtractTot) = aPartners(iPartner)
+			aShortSelected(iExtractTot) = aShorts(iPartner)
+			aFormatSelected(iExtractTot) = aFormats(iPartner)
+			aExportSelected(iExtractTot) = aExports(iPartner)
+			aFilesSelected(iExtractTot) = aFiles(iPartner)
+			aMapStmtSelected(iExtractTot) = aMapStmts(iMapTable)
+
+			'-------------------------------------------------
+			' Read the next table selected in the list
+			'-------------------------------------------------
+			iMapTable = ReadControlValue(3)
+		Loop
+
+		'-------------------------------------------------
+		' Read the next partner selected in the list
+		'-------------------------------------------------
+		iPartner = ReadControlValue(1)
+
+		'-------------------------------------------------
+		' Read the first SQL table selected
+		' in the list again
+		'-------------------------------------------------
+		iSppTable = ReadControlValue(2)
+
+		'-------------------------------------------------
+		' Read the first Map table selected
+		' in the list again
+		'-------------------------------------------------
+		iMapTable = ReadControlValue(3)
+	Loop
+
+End Sub
+
+Sub ProcessExtracts
+'***************************************************************
+'* Process each combination of table and partner
+'***************************************************************
+
+	Dim sNodeName, sTableName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapStmt As String
+	sNodeName = aNodeSelected(iExtractCnt)
+	sTableName = aTableSelected(iExtractCnt)
+	sTableType = aTableTypeSelected(iExtractCnt)
+	sPartnerName = aPartnerSelected(iExtractCnt)
+	sShortName = aShortSelected(iExtractCnt)
+	sFormat = aFormatSelected(iExtractCnt)
+	sExport = aExportSelected(iExtractCnt)
+	sFiles = aFilesSelected(iExtractCnt)
+	sMapStmt = aMapStmtSelected(iExtractCnt)
+
+	If sShortName <> sLastShortName and iExtractCnt <> 1 Then
+
+		'-------------------------------------------------
+		' Zip up all the extract files for the last
+		' partner if required
+		'-------------------------------------------------
+		If bZipFiles Then
+			If ZipFiles(sDefaultPath, sLastShortName) > 1 Then
+				Call MyPrint("Error zipping extract files for partner.")
+			End If
+		End If
+
+		Call MyPrint("Processing for partner complete.")
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("")
+
+	End If
+	
+	If sShortName <> sLastShortName Then
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("Processing partner '" + sPartnerName + " (" + sShortName + ")' ...")
+
+		'-------------------------------------------------
+		' Create the partner subdirectory if it doesn't
+		' already exist
+		'-------------------------------------------------
+		Dim iSuccess, iSecurity As Integer
+		Dim sLocalPath As String
+		iSecurity = 0
+		sLocalPath = sDefaultPath + "\" + sShortName
+		iSuccess = SetCurrentDirectory(sLocalPath )
+		if iSuccess = 0 Then
+			Call MyPrint("Creating sub-directory '" + sLocalPath + "'")
+			iSuccess = CreateDirectory(sLocalPath , iSecurity)
+			if iSuccess = 0 Then
+				Call MyPrint("Error creating sub-directory")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
+
+		' Save the last partner short name
+		sLastShortName = sShortName
+	End If
+
+	Call MyPrint("Starting process " + iExtractCnt + " of " + iExtractTot + " ...")
+
+	'-------------------------------------------------
+	' Call the subroutine to select the records from
+	' the selected table for the selected partner
+	'-------------------------------------------------
+	If sTableType = "SQL" Then
+		If bConfidentialSurveys = True Then
+			Call MyPrint("Including confidential surveys ...")
+		Else
+			Call MyPrint("Excluding confidential surveys ...")
+		End If
+		Call SelectSpecies(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, sTableName)
+	Else
+		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapStmt)
+	End If
+
+	Call MyPrint("Completed process " + iExtractCnt + " of " + iExtractTot + ".")
+	Call MyPrint("")
+
+	If iExtractCnt = iExtractTot Then
+
+		'-------------------------------------------------
+		' Zip up all the extract files for the last
+		' partner if required
+		'-------------------------------------------------
+		If bZipFiles Then
+			If ZipFiles(sDefaultPath, sLastShortName) > 1 Then
+				Call MyPrint("Error zipping extract files for partner.")
+			End If
+		End If
+
+		Call MyPrint("Processing for partner complete.")
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("")
+
+	End If
+	
+	'-------------------------------------------------
+	' Increment the progress bar to show progress
+	'-------------------------------------------------
+	ProgressBar = iExtractCnt
+
+	'-------------------------------------------------
+	' Go to the next selection in the list
+	'-------------------------------------------------
+	iExtractCnt = iExtractCnt + 1
+	If iExtractCnt > iExtractTot Then
+		'-------------------------------------------------
+		' Halt processing
+		'-------------------------------------------------
+		ProgressBar = -1
+	End If
+
+End Sub
+
+Sub SelectSpecies (ByVal nConn As Integer,
+	sPartnerName As String,
+	sShortName As String,
+	sFormat As String,
+	sExport As String,
+	sFiles As String,
+	sTableName As String)
+'*************************************************
+'* Routine to select the species records from
+'* the table name passed in the call that
+'* intersect with the boundaries where the
+'* partner equals the value passed in the call.
+'*************************************************
+
+	OnError Goto ErrorTrap
+
+	'-------------------------------------------------
+	' Check the partner requires something
+	'-------------------------------------------------
+	If UCase$(sExport) <> "YES" And
+		UCase$(sExport) <> "Y" And
+		((UCase$(sFormat) <> "SHP" And
+		UCase$(sFormat) <> "TAB" And
+		UCase$(sFormat) <> "BOTH") Or
+		sFiles = "") Then
+		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
+		Exit Sub
+	End If
+
+	'-------------------------------------------------
+	' Setup the temporary and local table names
+	'-------------------------------------------------
+	Dim sTempName, sLocalPath As String
+	sTempName = sTableName + "_temp"
+	sLocalPath = sDefaultPath + "\" + sShortName
+	Call MyPrint("Processing table = '" + sTableName + "' ...")
+
+	'-------------------------------------------------
+	' Execute the SQL Server stored procedure to select
+	' the species records intersecting with the current
+	' partner boundary
+	'-------------------------------------------------
+	Dim nStmt1 As Integer
+	Call MyPrint("Executing spatial selection ...")
+	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.usp_SelectSppRecords '" + sDefaultSchema
+	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
+	 + sPartnerName + "', '" + sShortName + "', '" + sTableName + "'")
+	Call MyPrint("Spatial selection complete.")
+
+	'-------------------------------------------------
+	' Close the results
+	'-------------------------------------------------
+	Server nStmt1 Close
+
+	'-------------------------------------------------
+	' Close the temporary table if already/still open
+	' in the current MapInfo session
+	'-------------------------------------------------
+	If TableIsOpen(sTempName) Then
+		Call MyPrint("Closing the temporary table ...")
+		Close Table sTempName
+	End If
+
+	'-------------------------------------------------
+	' Loop through all the SQL clauses in the array
+	' and create a subset of the temporary table
+	' using each clause if the clause name is found
+	' in the partner table for this partner
+	'-------------------------------------------------
+	Dim i As Integer
+	Dim sNodeName, sLocalName as String
+	For i = 1 to UBound(aFileSppNodes)
+
+		'-------------------------------------------------
+		' If this SQL clause is found in the partner
+		' table record then process it, otherwise skip
+		' to the next SQL clause.
+		'-------------------------------------------------
+		sNodeName = aFileSppNodes(i)
+		If Instr(1, Ucase$(sFiles), Ucase$(sNodeName)) > 0 then
+			sLocalName = aFileSppTables(i)
+		Else
+			Goto NextClause
+		End If
+
+		Call MyPrint("")
+		Call MyPrint("Extracting '" + sLocalName + "' ...")
+
+		'-------------------------------------------------
+		' Clear the SQL clause that excludes the
+		' confidential surveys if they are required
+		'-------------------------------------------------
+		Dim sExtraSQLClause As String
+		If bConfidentialSurveys = True Then
+			sExtraSQLClause = ""
+		Else
+			sExtraSQLClause = sConfidentialClause
+		End If
+
+		'-------------------------------------------------
+		' Count the number of species records that have
+		' been selected in the output temporary table
+		'-------------------------------------------------
+		Dim nStmt2 As Integer
+		Dim iRecTotal As Integer
+		Dim iRecStatus As Integer
+		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause)
+		Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
+		Server nStmt2 Fetch Next
+
+		'-------------------------------------------------
+		' Close the results
+		'-------------------------------------------------
+		Server nStmt2 Close
+
+		'-------------------------------------------------
+		' Check if the maximum number of records will be
+		' exceeded
+		'-------------------------------------------------
+		If iRecTotal > iRecMax Then
+			Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
+			Goto NextClause
+		End If
+
+		'-------------------------------------------------
+		' Check if any records were extracted
+		'-------------------------------------------------
+		If iRecTotal = 0 Then
+			Call MyPrint("No records found - extract skipped.")
+			Goto NextClause
+		End If
+
+		Call MyPrint("" + iRecTotal + " records to extract.")
+
+		'-------------------------------------------------
+		' Check if the temporary table is already/still open
+		' and close it if it is
+		'-------------------------------------------------
+		If TableIsOpen(sLocalName) Then
+			Call MyPrint("Closing temporary table ...")
+			Close Table sLocalName
+		End If
+
+		'-------------------------------------------------
+		' Check if the local table is already/still open
+		' and close it if it is
+		'-------------------------------------------------
+		If TableIsOpen(sLocalName + "_" + sShortName) Then
+			Call MyPrint("Closing local table ...")
+			Close Table sLocalName + "_" + sShortName
+		End If
+
+		'-------------------------------------------------
+		' Set up the SQL statement for extracting from
+		' the temporary table
+		'-------------------------------------------------
+		Dim sSQLStmt As String
+		sSQLStmt = "Select " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause
+
+		'-------------------------------------------------
+		' Link the temporary table as a local table
+		'-------------------------------------------------
+		Call MyPrint("Linking temporary table ...")
+		Server nConn Link Table
+		sSQLStmt
+		Toolkit "ODBC"
+		Into sLocalName + "_" + sShortName
+		File sLocalPath + "\" + sLocalName
+		Autokey Off
+		ReadOnly
+
+		'-------------------------------------------------
+		' Unlink the temporary table to leave the local
+		' table as a regular standalone table
+		'-------------------------------------------------
+		Call MyPrint("Unlinking temporary table ...")
+		Unlink sLocalName + "_" + sShortName
+
+		'-------------------------------------------------
+		' Also export the table as a CSV if required
+		'-------------------------------------------------
+		If UCase$(sExport) = "YES" Or UCase$(sExport) = "Y" Then
+			Call MyPrint("Exporting as a CSV ...")
+			Export sLocalName + "_" + sShortName
+				Into sLocalPath + "\" + sLocalName + ".csv"
+				Type "CSV"
+				Titles
+				Overwrite
+		End If
+
+		'-------------------------------------------------
+		' Translate the table to ESRI shapefile if required
+		'-------------------------------------------------
+		If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
+			Call TranslateToShapefile(sDefaultPath, sLocalPath, sLocalName, sShortName)	
+		End If
+
+		'-------------------------------------------------
+		' If the partner requires a MapInfo table
+		'-------------------------------------------------
+		If UCase$(sFormat) = "TAB" Or UCase$(sFormat) = "BOTH" Then
+			'-------------------------------------------------
+			' Check if the local table is open and close it
+			'-------------------------------------------------
+			If TableIsOpen(sLocalName + "_" + sShortName) Then
+
+				'-------------------------------------------------
+				' Turn on FastEdit to speed up the updates
+				'-------------------------------------------------
+				Set Table sLocalName + "_" + sShortName FastEdit On
+
+				'-------------------------------------------------
+				' Add an index to the precision field to speed
+				' up the symbology setting
+				'-------------------------------------------------
+				' Create Index On sLocalName + "_" + sShortName(GRPRECISION)
+
+				'-------------------------------------------------
+				' Set the symbology for the table before closing
+				'-------------------------------------------------
+				Call MyPrint("Setting symbology in table ...")
+
+				Call SetSymbology(sNodeName, sLocalName, sShortName)
+
+				Dim sCmd As String
+				sCmd = "Commit Table " + sLocalName + "_" + sShortName
+				Run Command (sCmd)
+
+				Call MyPrint("Closing the MapInfo table ...")
+				Close Table sLocalName + "_" + sShortName
+			End If
+		Else
+			'-------------------------------------------------
+			' If the partner doesn't require a MapInfo table
+			' check if the local table is open and drop it
+			'-------------------------------------------------
+			If TableIsOpen(sLocalName + "_" + sShortName) Then
+				Call MyPrint("Dropping the MapInfo table ...")
+				Drop Table sLocalName + "_" + sShortName
+			End If
+		End If
+
+	'-------------------------------------------------
+	' Process the next SQL clause
+	'-------------------------------------------------
+NextClause:
+	Next
+
+	Exit Sub
+	
+ErrorTrap:
+	Note str$(Err()) + ": " + Error$()
+	Call MyPrint(str$(Err()) + ": " + Error$())
+	Exit Sub
+
+End Sub
+
+Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String)
+'***************************************************************
+'* Retrieve the symbology styles and clauses from the config file
+'* which is a XML document
+'***************************************************************
+
+	Dim bParseError As SmallInt
+	Dim hXMLDoc As MIXmlDocument
+	Dim hXMLRoot As MIXmlNode
+	Dim hXMLNode As MIXmlNode
+	Dim hXMLSpeciesTableNode As MIXmlNode
+	Dim hXMLTableNode As MIXmlNode
+	Dim hXMLSymbologyNode As MIXmlNode
+	Dim hXMLSymbolNodeList As MIXMLNodeList
+	Dim hXMLSymbolNode As MIXmlNode
+
+	OnError Goto GetSymbologyError
+
+	'-------------------------------------------------
+	' Create a document handle
+	'-------------------------------------------------
+	hXMLDoc = MIXmlDocumentCreate()
+	If hXMLDoc Then
+
+		'-------------------------------------------------
+		' Load the document into the document handle
+		'-------------------------------------------------
+		Dim iXMLLoad As SmallInt
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		if iXMLLoad > 0 Then
+
+			'-------------------------------------------------
+			' Get a handle on the XML root node of the document
+			'-------------------------------------------------
+			hXMLRoot = MIXmlDocumentGetRootNode(hXMLDoc)
+			If hXMLRoot Then
+
+				'-------------------------------------------------
+				' Get a handle on the DataExtractor node
+				'-------------------------------------------------
+				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
+	          If hXMLNode Then
+	
+					'-------------------------------------------------
+					' Get a handle on the SpeciesTables node
+					'-------------------------------------------------
+					hXMLSpeciesTableNode = MIXmlSelectSingleNode(hXMLNode, "SpeciesTables")
+
+					'-------------------------------------------------
+					' Get a handle on the current species table node
+					'-------------------------------------------------
+					hXMLTableNode = MIXmlSelectSingleNode(hXMLSpeciesTableNode, sNodeName)
+
+					'-------------------------------------------------
+					' Get a handle on the symbology node for the table
+					'-------------------------------------------------
+					hXMLSymbologyNode = MIXmlSelectSingleNode(hXMLTableNode, "Symbology")
+
+					'-------------------------------------------------
+					' Get a handle on the node map of the above node
+					'-------------------------------------------------
+					hXMLSymbolNodeList = MIXMLGetChildList(hXMLSymbologyNode)
+
+					'-------------------------------------------------
+					' Get a handle on the first attribute in the node list
+					'-------------------------------------------------
+					hXMLSymbolNode = MIXMLGetNextNode(hXMLSymbolNodeList)
+
+					'-------------------------------------------------
+					' Loop through all the attributes in the node list
+					' applying the style using the SQL clauses
+					'-------------------------------------------------
+					Dim i As Integer
+					i = 0
+					Do while hXMLSymbolNode
+						
+						i = i + 1
+						' SQL clause used to retrieve the required rows from the species table
+						Dim sClause As String
+						sClause = GetSingleNodeValue(hXMLSymbolNode, "Clause")
+
+						' Type of object
+						Dim sObject As String
+						sObject = GetSingleNodeValue(hXMLSymbolNode, "Object")
+
+						' Type of style
+						Dim sType As String
+						sType = GetSingleNodeValue(hXMLSymbolNode, "Type")
+
+						' Style of the symbol
+						Dim sStyle As String
+						sStyle = GetSingleNodeValue(hXMLSymbolNode, "Style")
+
+						'-------------------------------------------------
+						' Select all the rows of the desired object type
+						' matching the required SQL clause
+						'-------------------------------------------------
+						Dim sCmd As String
+						sCmd = "Select * From " + sLocalName + "_" + sShortName + " Where Str$(obj) = """ + sObject + """ And " + sClause + " Into NewStyle"
+						Run Command (sCmd)
+
+						'-------------------------------------------------
+						' Count the number of rows selected
+						'-------------------------------------------------
+						Dim iRows As Integer
+						iRows = TableInfo(NewStyle, TAB_INFO_NROWS)
+
+						Call MyPrint("Setting " + sObject + " " + sType + " style for " + iRows + " rows where " + sClause)
+
+						'-------------------------------------------------
+						' If any rows were selected then set the styles
+						'-------------------------------------------------
+						If iRows > 0 Then
+
+							'-------------------------------------------------
+							' Fetch the first of the selected rows
+							'-------------------------------------------------
+							Fetch First from NewStyle
+
+							'-------------------------------------------------
+							' Loop through all the selected rows setting the
+							' symbology style
+							'-------------------------------------------------
+							Dim x as Integer
+							x = 1
+								Do while x <= iRows
+								'-------------------------------------------------
+
+								' Set the current object to update
+								'-------------------------------------------------
+								Dim oUpdateObj as Object
+								oUpdateObj = NewStyle.obj
+
+								Dim stlSymbol As Symbol
+								Dim stlPen As Pen
+								Dim stlBrush As Brush
+
+								'-------------------------------------------------
+								' Alter the object style depending on the object
+								' type and style type
+								'-------------------------------------------------
+								Do Case sObject
+									Case "Point"
+										If sType = "Symbol" Then
+											stlSymbol = STLText2Symbol(sStyle)
+											Alter Object oUpdateObj Info OBJ_INFO_SYMBOL, stlSymbol
+										End If
+									Case "Region"
+										If sType = "Pen" Then
+											stlPen = STLText2Pen(sStyle)
+											Alter Object oUpdateObj Info OBJ_INFO_PEN, stlPen
+										End If
+										If sType = "Brush" Then
+											stlBrush = STLText2Brush(sStyle)
+											Alter Object oUpdateObj Info OBJ_INFO_BRUSH, stlBrush
+										End If
+									Case Else
+								End Case
+
+								Update NewStyle Set Obj = oUpdateObj Where RowID = x
+
+								'-------------------------------------------------
+								' Fetch the next of the selected rows
+								'-------------------------------------------------
+								Fetch next from NewStyle
+								x = x + 1
+
+							Loop
+
+						End If
+
+						'-------------------------------------------------
+						' Get a handle on the next attribute in the node list
+						'-------------------------------------------------
+						hXMLSymbolNode = MIXMLGetNextNode(hXMLSymbolNodeList)
+
+					Loop
+
+				End If
+
+			End If
+
+		Else
+
+			Note "Error : " + MIGetErrorMessage()
+
+		End If
+
+	End If
+
+CleanUp:
+	'-------------------------------------------------
+	' Destroy the handles
+	'-------------------------------------------------
+	If hXMLSymbolNode Then Call MIXmlNodeDestroy(hXMLSymbolNode) End If
+	If hXMLSymbolNodeList Then Call MIXmlNodeListDestroy(hXMLSymbolNodeList) End If
+	If hXMLSymbologyNode Then Call MIXmlNodeDestroy(hXMLSymbologyNode) End If
+	If hXMLTableNode Then Call MIXmlNodeDestroy(hXMLTableNode) End If
+
+	If hXMLSpeciesTableNode Then Call MIXmlNodeDestroy(hXMLSpeciesTableNode) End If
+	If hXMLNode Then Call MIXmlNodeDestroy(hXMLNode) End If
+	If hXMLRoot Then Call MIXmlNodeDestroy(hXMLRoot) End If
+	If hXMLDoc Then Call MIXmlDocumentDestroy(hXMLDoc) End If
+
+	Exit Sub
+
+GetSymbologyError:
+	Note str$(Err()) + ": " + Error$()
+	Exit Sub
+
+End Sub
+
+Sub SelectMaps (sPartnerName As String,
+	sShortName As String,
+	sFormat As String,
+	sExport As String,
+	sFiles As String,
+	sNodeName as String,
+	sTableName As String,
+	sMapStmt As String)
+'*************************************************
+'* Routine to select the records from the
+'* MapInfo table name passed in the call that
+'* intersect with the boundaries where the
+'* partner equals the value passed in the call.
+'*************************************************
+
+	OnError Goto ErrorTrap
+
+	'-------------------------------------------------
+	' Check the partner requires something
+	'-------------------------------------------------
+	If UCase$(sExport) <> "YES" And
+		UCase$(sExport) <> "Y" And
+		((UCase$(sFormat) <> "SHP" And
+		UCase$(sFormat) <> "TAB" And
+		UCase$(sFormat) <> "BOTH") Or
+		sFiles = "") Then
+		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
+		Exit Sub
+	End If
+
+	'-------------------------------------------------
+	' If this Map table is found in the partner
+	' table record then process it, otherwise skip it
+	'-------------------------------------------------
+	If Instr(1, Ucase$(sFiles), Ucase$(sNodeName)) = 0 then
+		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
+		Exit Sub
+	End If
+
+	Call MyPrint("Processing table = '" + sTableName + "' ...")
+
+	'-------------------------------------------------
+	' Setup the temporary and local table names
+	'-------------------------------------------------
+	Dim sLocalPath, sLocalName As String
+	sLocalPath = sDefaultPath + "\" + sShortName
+	sLocalName = sTableName
+
+	'-------------------------------------------------
+	' Check if the local table is already/still open
+	' and close it if it is
+	'-------------------------------------------------
+	If TableIsOpen(sLocalName + "_" + sShortName) Then
+		Call MyPrint("Closing local table ...")
+		Close Table sLocalName + "_" + sShortName
+	End If
+
+	'-------------------------------------------------
+	' Execute the SQL statement to select the table
+	' records intersecting with the required
+	' partner boundary
+	'-------------------------------------------------
+	Call MyPrint("Executing spatial selection ...")
+	Dim sCmd As String
+	sCmd = "Select " + sMapStmt + " from " + sTableName + " Where obj Intersects (Select obj from " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") Into " + sLocalName + "_" + sShortName
+	Run Command (sCmd)
+
+	'-------------------------------------------------
+	' Count the number of records that have
+	' been selected
+	'-------------------------------------------------
+	Dim iRecTotal As Integer
+	iRecTotal = TableInfo(sLocalName + "_" + sShortName, TAB_INFO_NROWS)
+
+	'-------------------------------------------------
+	' Check if the maximum number of records will be
+	' exceeded
+	'-------------------------------------------------
+	If iRecTotal > iRecMax Then
+		Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
+		Call MyPrint("")
+		Exit Sub
+	End If
+
+	'-------------------------------------------------
+	' Check if any records were extracted
+	'-------------------------------------------------
+	If iRecTotal = 0 Then
+		Call MyPrint("No records found - extract skipped.")
+		Call MyPrint("")
+		Exit Sub
+	End If
+
+	Call MyPrint("" + iRecTotal + " records selected.")
+
+	'-------------------------------------------------
+	' Save the local table
+	'-------------------------------------------------
+	Call MyPrint("Saving local table ...")
+	sCmd = "Commit Table " + sLocalName + "_" + sShortName + " As " + Chr$(34) + sLocalPath + "\" + sLocalName + ".tab" + Chr$(34) + " TYPE NATIVE Charset " + Chr$(34) + "WindowsLatin1" + Chr$(34)
+	Run Command (sCmd)
+
+	'-------------------------------------------------
+	' Close the local table and re-open it (as it seems
+	' to get locked somehow and won't drop)
+	'-------------------------------------------------
+	Close Table sLocalName + "_" + sShortName
+	sCmd = "Open Table " + Chr$(34) + sLocalPath + "\" + sLocalName + ".tab" + Chr$(34) + " As " + sLocalName + "_" + sShortName
+	Run Command (sCmd)
+
+	'-------------------------------------------------
+	' Also export the table as a CSV if required
+	'-------------------------------------------------
+	If UCase$(sExport) = "YES" Or UCase$(sExport) = "Y" Then
+		Call MyPrint("Exporting as a CSV ...")
+		Export sLocalName + "_" + sShortName
+			Into sLocalPath + "\" + sLocalName + ".csv"
+			Type "CSV"
+			Titles
+			Overwrite
+	End If
+
+	'-------------------------------------------------
+	' Translate the table to ESRI shapefile if required
+	'-------------------------------------------------
+	If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
+		Call TranslateToShapefile(sDefaultPath, sLocalPath, sLocalName, sShortName)	
+	End If
+
+	'-------------------------------------------------
+	' If the partner requires a MapInfo table
+	'-------------------------------------------------
+	If UCase$(sFormat) = "TAB" Or UCase$(sFormat) = "BOTH" Then
+		'-------------------------------------------------
+		' Check if the local table is open and close it
+		'-------------------------------------------------
+		If TableIsOpen(sLocalName + "_" + sShortName) Then
+			Call MyPrint("Closing the MapInfo table ...")
+			Close Table sLocalName + "_" + sShortName
+		End If
+	Else
+		'-------------------------------------------------
+		' If the partner doesn't require a MapInfo table
+		' drop (delete) the table
+		'-------------------------------------------------
+		If TableIsOpen(sLocalName + "_" + sShortName) Then
+			Call MyPrint("Dropping the MapInfo table ...")
+			Drop Table sLocalName + "_" + sShortName
+		End If
+	End If
+
+	Exit Sub
+	
+ErrorTrap:
+	Note str$(Err()) + ": " + Error$()
+	Call MyPrint(str$(Err()) + ": " + Error$())
+	Exit Sub
+
+End Sub
+
+Sub AboutBox
+'***************************************************************
+'* Display the 'About' dialog box
+'***************************************************************
+
+	Dialog
+		Title "About Data Extractor 1.51"
+		Width 230
+		Height 115
+
+	Control StaticText
+		Title "This program will extract GiGL species records and/or GIS"
+		Position 10,10
+	Control StaticText
+		Title "layers that intersect with partner boundary feature(s)."
+		Position 10,20
+	Control StaticText
+		Title "The user can select which GiGL species tables or GIS layers"
+		Position 10,30
+	Control StaticText
+		Title "to extract and which partner boundaries to extract for."
+		Position 10,40
+	Control StaticText
+		Title "Created by Andy Foy Consulting."
+		Position 10,60
+	Control StaticText
+		Title "Copyright© 2012-2013 Greenspace Information for Greater London."
+		Position 10,70
+	Control OKButton
+		Position 185,95
+
+End Sub
+
+Sub MyPrint(ByVal sMsg As String)
+'***************************************************************
+'* Bespoke print function
+'***************************************************************
+
+	'-------------------------------------------------
+	' Open the log file for output
+	'-------------------------------------------------
+	Open File sLogFileName For Append As #1
+
+	'-------------------------------------------------
+	' Write the message passed to the output file
+
+	'-------------------------------------------------
+	Print #1, FormatDate$(CurDate()) + " " + FormatTime$(CurTime(),"H:mm:ss") + " : " + sMsg
+
+	'-------------------------------------------------
+	' Close the output file
+	'-------------------------------------------------
+	Close File #1
+
+End Sub
+
+Sub PrintLogFile()
+'***************************************************************
+'* Print the log file to the message window
+'***************************************************************
+
+	'-------------------------------------------------
+	' Open the log file for input
+	'-------------------------------------------------
+	Open File sLogFileName For Input As #99
+
+	'-------------------------------------------------
+	' Get the first line
+	'-------------------------------------------------
+	Dim sMsg As String
+	Line Input #99, sMsg
+
+	'-------------------------------------------------
+	' Loop through all the lines until the log file
+	' is empty
+	'-------------------------------------------------
+	Do Until EOF(99)
+		'-------------------------------------------------
+		' Print the log file line to the message window
+		'-------------------------------------------------
+		Print sMsg
+
+		'-------------------------------------------------
+		' Get the first line
+		'-------------------------------------------------
+		Line Input #99, sMsg
+	Loop
+
+	'-------------------------------------------------
+	' Refresh the message window
+	'-------------------------------------------------
+	Update Window WIN_MESSAGE
+
+	'-------------------------------------------------
+	' Close the log file
+	'-------------------------------------------------
+	Close File #99
+
+End Sub
+
+Sub egsit
+'***************************************************************
+'* Exit the program
+'***************************************************************
+
+	End Program
+
+End Sub
