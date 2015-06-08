@@ -26,17 +26,17 @@ partners.
 
   <!-- The name of the log file used by the tool to output messages -->
   <LogFileName>
-	<value>D:\GiGL\Data Exchange\Extracts\DataExtractor.log</value>
+	<value>D:\LRCs\GiGL\Data Exchange\Extracts\DataExtractor.log</value>
   </LogFileName>
 
   <!-- The location of the File DSN that specifies which SQL Server database to connect to -->
   <FileDSN>
-	<value>D:\SkyDrive\GiGL\Data Exchange\SQL Server\NBNData.dsn</value>
+	<value>D:\Andy\GiGL\Data Exchange\SQL Server\NBNData.dsn</value>
   </FileDSN>
 
   <!-- The existing file location under which all partner sub-folders will be created -->
   <DefaultPath>
-	<value>D:\GiGL\Data Exchange\Extracts</value>
+	<value>D:\LRCs\GiGL\Data Exchange\Extracts</value>
   </DefaultPath>
 
   <!-- The schema used in the SQL Server database -->
@@ -95,12 +95,12 @@ partners.
   <!-- The SQL statement used to list all the species tables in SQL Server that can be selected
        by the user to extract for each partner -->
   <TableListSQL>
-	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL_SPP%' And table_name Not Like '%temp' Order By table_name</value>
+	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL[_]Spp[_]%' And table_name Not Like 'GiGL[_]Spp[_]%[_]%' Order By table_name</value>
   </TableListSQL>
 
   <!-- The maximum number of records what will be extracted in any one partner extract -->
   <RecMax>
-	<value>1000000</value>
+	<value>10000000</value>
   </RecMax>
 
   <!-- The default value for zipping the extract files -->

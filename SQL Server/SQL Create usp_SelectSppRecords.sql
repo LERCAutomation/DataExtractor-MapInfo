@@ -2,7 +2,7 @@
   DataExtractor is a MapInfo tool to extract biodiversity information
   from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
   
-  Copyright © 2012-2013 Andy Foy Consulting
+  Copyright © 2012-2013, 2015 Andy Foy Consulting
   
   This file is part of the MapInfo tool 'DataExtractor'.
   
@@ -38,13 +38,19 @@ GO
 	@PartnerColumn	The name of the column containing the partner to be used.
 	@AbbrevColumn	The name of the column containing the partner abbreviation.
 	@SpeciesTable	The name of the table contain the species records.
+	@UserId			The userid of the user executing the selection.
 
-  Created:	Nov 2012
+  Created:		Andy Foy - Nov 2012
+  Last revised: Andy Foy - Jun 2015
 
-  Last revision information:
-    $Revision: 2 $
-    $Date: 02/04/13 $
-    $Author: Andy Foy $
+ *****************  Version 2  *****************
+ Author: Andy Foy		Date: 08/06/2015
+ A. Include userid as parameter to use in temporary SQL
+	table name to enable concurrent use of tool.
+
+ *****************  Version 1  *****************
+ Author: Andy Foy		Date: 01/11/2012
+ A. Initial version of code.
 
 \*===========================================================================*/
 
@@ -54,7 +60,7 @@ if exists (select ROUTINE_NAME from INFORMATION_SCHEMA.ROUTINES where ROUTINE_SC
 GO
 
 -- Create the stored procedure
-CREATE PROCEDURE dbo.usp_SelectSppRecords @Schema varchar(50), @PartnerTable varchar(50), @PartnerColumn varchar(50), @Partner varchar(50), @Abbrev varchar(50), @SpeciesTable varchar(50)
+CREATE PROCEDURE dbo.usp_SelectSppRecords @Schema varchar(50), @PartnerTable varchar(50), @PartnerColumn varchar(50), @Partner varchar(50), @Abbrev varchar(50), @SpeciesTable varchar(50), @UserId varchar(50)
 AS
 BEGIN
 
@@ -67,9 +73,10 @@ BEGIN
 		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Started.'
 
 	DECLARE @sqlCommand nvarchar(2000)
+	DECLARE @params nvarchar(2000)
 
 	DECLARE @TempTable varchar(50)
-	SET @TempTable = @SpeciesTable + '_temp'
+	SET @TempTable = @SpeciesTable + '_' + @UserId
 
 	-- Drop the index on the sequential primary key of the temporary table if it already exists
 	if exists (select column_name from INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE where TABLE_SCHEMA = @Schema and TABLE_NAME = @TempTable and COLUMN_NAME = 'MI_PRINX' and CONSTRAINT_NAME = 'PK_' + @TempTable + '_MI_PRINX')
@@ -204,9 +211,8 @@ BEGIN
 		',Spp.[SP_GEOMETRY] ' +
 		' FROM ' + @Schema + '.' + @SpeciesTable + ' As Spp, ' + @PartnerTable + ' As Poly' +
 		' WHERE ' + @PartnerColumn + ' = ''' + @Partner + '''' +
---		' AND Spp.SP_GEOMETRY.Filter(Poly.SP_GEOMETRY) = 1'
-		' AND Spp.SP_GEOMETRY.STIntersects(Poly.SP_GEOMETRY) = 1'
---		' AND Poly.SP_GEOMETRY IS NOT NULL'
+		' AND Spp.SP_GEOMETRY.STIntersects(Poly.SP_GEOMETRY) = 1' +
+		' AND Poly.SP_GEOMETRY IS NOT NULL'
 	EXEC (@sqlcommand)
 
 	DECLARE @RecCnt Int
@@ -219,22 +225,6 @@ BEGIN
 	if exists (select TABLE_NAME from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = 'MAPINFO' and TABLE_NAME = 'MAPINFO_MAPCATALOG')
 	BEGIN
 
-		-- Drop the synonym for the table passed to the procedure if it 't already exists
-		if exists (select name from sys.synonyms where name = 'Species_Temp')
-		BEGIN
-			If @debug = 1
-				PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Dropping table synonym ...'
-			Set @sqlCommand = 'DROP SYNONYM Species_Temp'
-			EXEC (@sqlcommand)
-		END
-
-		-- Create a synonym for the table passed to the procedure
-		If @debug = 1
-			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Creating table synonym ...'
-		Set @sqlCommand = 'CREATE SYNONYM Species_Temp' +
-			' FOR ' + @Schema + '.' + @TempTable
-		EXEC (@sqlcommand)
-
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Determining spatial extent ...'
 
@@ -246,11 +236,18 @@ BEGIN
 			@Y2 int
 
 		-- Retrieve the geometric extent values and store as variables
-		SELECT  @X1 = MIN(EASTINGS),
-				@Y1 = MIN(NORTHINGS),
-				@X2 = MAX(EASTINGS) + MAX(GRPRECISION),
-				@Y2 = MAX(NORTHINGS) + MAX(GRPRECISION)
-		From Species_Temp
+		SET @sqlcommand = 'SELECT @xMin = MIN(EASTINGS), ' +
+								 '@yMin = MIN(NORTHINGS), ' +
+								 '@xMax = MAX(EASTINGS) + MAX(GRPRECISION), ' +
+								 '@yMax = MAX(NORTHINGS) + MAX(GRPRECISION) ' +
+								 'FROM ' + @Schema + '.' + @TempTable
+
+		SET @params =	'@xMin int OUTPUT, ' +
+						'@yMin int OUTPUT, ' +
+						'@xMax int OUTPUT, ' +
+						'@yMax int OUTPUT'
+	
+		EXEC sp_executesql @sqlcommand, @params, @xMin = @X1 OUTPUT, @yMin = @Y1 OUTPUT, @xMax = @X2 OUTPUT, @yMax = @Y2 OUTPUT
 
 		-- Delete the MapInfo MapCatalog entry if it already exists
 		if exists (select TABLENAME from [MAPINFO].[MAPINFO_MAPCATALOG] where TABLENAME = @TempTable)

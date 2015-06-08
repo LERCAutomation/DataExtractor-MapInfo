@@ -1,7 +1,8 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright Â© 2013 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2013, 2015 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2015 Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -19,13 +20,23 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* GenFunctions v1.4
+'* GenFunctions v1.41
 '*
 '* Contains general functions used by the DataExtractor tool.
 '*
 '*
-'* Created:			Andy Foy - February 2013
+'* Created:		Andy Foy - February 2013
 '* Last revised:	Andy Foy - April 2013
+'* 
+'* *****************  Version 1.41  *****************
+'* Author: Andy Foy		Date: 08/06/2015
+'* A. Added functions to return userid, find and replace
+'*    a string, and get the length of a whole table row.
+'* 
+'* *****************  Version 1.40  *****************
+'* Author: Andy Foy		Date: 01/04/2015
+'* A. Initial version of code based on Data Extractor tool.
+'* 
 '***************************************************************
 Include "DataExtractor.def"
 
@@ -273,4 +284,112 @@ Function StringSplit(ByVal sText As String, ByVal sSplitChar As String, arrParts
 	Exit Function 
 '------------------------- 
 ErrorOccured: 
+End Function
+
+Function StringReplace(ByVal sToBeSearched As String, ByVal sSearchFor As String, ByVal sReplaceWith As String) As String
+'*************************************************
+'* Finds and replaces one string with another
+'* in a given string
+'*************************************************
+
+Dim i, nLenR, nLenS As Integer
+OnError GoTo ErrorOccured
+
+STRINGReplace = sToBeSearched
+
+nLenR = Len(sReplaceWith)
+nLenS = Len(sSearchFor)
+i = InStr(1, sToBeSearched, sSearchFor)
+Do While i > 0
+   sToBeSearched = Left$(sToBeSearched,i - 1) + sReplaceWith
+               + Right$(sToBeSearched, Len(sToBeSearched) - ((i - 1) + nLenS))
+   i = InStr(i + nLenR, sToBeSearched, sSearchFor)
+Loop
+STRINGReplace = sToBeSearched
+
+Exit Function
+
+'-------------------------
+ErrorOccured:
+
+End Function
+
+Function GetRowLength(ByVal sTableName As String) As Integer
+'*************************************************
+'* Calculate the total row length for a table
+'*************************************************
+
+	'-------------------------------------------------
+	' Loop through all the columns in the table and
+	' sum the column lengths
+	'-------------------------------------------------
+	Dim i As Integer
+	Dim iRowLength As Integer
+	Dim iColumnType As SmallInt
+	iRowLength = 1
+
+	For i = 1 to TableInfo(sTableName, TAB_INFO_NCOLS)
+ 
+       iColumnType = ColumnInfo(sTableName, "col"&i, COL_INFO_TYPE)
+
+		Do Case iColumnType
+			Case 1
+				iRowLength = iRowLength + ColumnInfo(sTableName, "col"&i, COL_INFO_WIDTH)
+			Case 2
+				iRowLength = iRowLength + ColumnInfo(sTableName, "col"&i, COL_INFO_WIDTH)
+			Case 3
+				iRowLength = iRowLength + 4
+			Case 4
+				iRowLength = iRowLength + 2
+			Case 5
+				iRowLength = iRowLength + 4
+			Case 6
+				iRowLength = iRowLength + 1
+			Case 8
+				iRowLength = iRowLength + 8
+			Case 37
+				iRowLength = iRowLength + 4
+			Case 38
+				iRowLength = iRowLength + 8
+			Case Else
+				Call MyPrint("Column type " + iColumnType + " unrecognised.  Column length unknown")
+		End Case
+
+	Next
+
+	GetRowLength = iRowLength
+
+End Function
+
+Function GetUserID() As String
+'*************************************************
+'* Get the User ID of the current user
+'*************************************************
+
+	'-------------------------------------------------
+	' Loop through all the columns in the table and
+	' sum the column lengths
+	'-------------------------------------------------
+	Dim sUserID As String ' receives name of the user
+	Dim iLength As Integer ' length of the string
+	Dim iRetVal As Integer ' return value
+
+	'-------------------------------------------------
+	' Create room in the buffer to receive the returned string
+	'-------------------------------------------------
+	sUserID = Space$(255)
+	iLength = 255
+
+	'-------------------------------------------------
+	' Get the user id
+	'-------------------------------------------------
+	iRetVal = GetUserName(sUserID, iLength)
+
+	'-------------------------------------------------
+	' Extract the returned info from the buffer
+	'-------------------------------------------------
+	sUserID = Left$(sUserID, iLength - 1)
+
+	GetUserID = sUserID
+
 End Function

@@ -1,7 +1,8 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright Â© 2012-2013 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2012-2013, 2015 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2015 Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -17,6 +18,16 @@
 '* 
 '* You should have received a copy of the GNU General Public License
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'*
+'***************************************************************
+'* DataSelector.def v1.52
+'*
+'* Defines global variables and declares subroutines and functions.
+'*
+'*
+'* Created:		Andy Foy - February 2013
+'* Last revised:	Andy Foy - June 2015
+'***************************************************************
 
 Include "MapBasic.def"
 Include "Menu.def"
@@ -129,6 +140,8 @@ Declare Sub MIXmlAttributeListDestroy Lib MIXML_LIB_NAME Alias "MIXmlAttributeLi
 '-------------------------------------------------
 Declare Function TableIsOpen
 	(ByVal sTabName As String) As Logical
+Declare Function GetRowLength
+	(ByVal sTableName As String) As Integer
 Declare Function ExecuteAndWait
 	(ByVal cmdLine as string) As Integer
 Declare Function ZipFiles
@@ -170,6 +183,11 @@ Declare Function StringSplit
 	(ByVal sText As String,
 	ByVal sSplitChar As String,
 	arrParts() As String) As Integer
+Declare Function StringReplace
+	(ByVal sToBeSearched As String,
+	ByVal sSearchFor As String,
+	ByVal sReplaceWith As String) As String
+Declare Function GetUserID() As String
 
 Declare Function CreateProcessA Lib "kernel32"
 	(ByVal lpApplicationName As Integer,
@@ -182,6 +200,9 @@ Declare Function CreateProcessA Lib "kernel32"
 	ByVal lpCurrentDirectory As Integer,
 	lpStartupInfo As STARTUPINFO,
 	lpProcessInformation As PROCESS_INFORMATION) As Integer
+Declare Function GetUserName Lib "advapi32.dll" Alias "GetUserNameA" 
+  (lpBuffer As String, nSize As Integer) As Integer
+
 Declare Function MIXmlDocumentCreate Lib MIXML_LIB_NAME
 	Alias "MIXmlDocumentCreate" () As MIXmlDocument
 Declare Function MIXmlDocumentLoad Lib MIXML_LIB_NAME

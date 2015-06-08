@@ -53,22 +53,42 @@ Sub TranslateToShapefile(sDefaultPath As String, sLocalPath As String, sLocalNam
 	sResultDir = sLocalPath
 	sMappingFile = sDefaultPath + "\" + sLocalName + ".fme"
 	sLogFile = sDefaultPath + "\" + sLocalName + "_MUT.log"
+
 	Call AmendVersion(sInputFile)
+	
+	'-------------------------------------------------
+	' Get the version of MI currently running, multiplied
+	' by 100
+	'-------------------------------------------------
+	Dim iMIVersion As Integer
+	iMIVersion = SystemInfo(SYS_INFO_MIVERSION)
 	
 	'-------------------------------------------------
 	' Create the mapping file command string
 	'-------------------------------------------------
 	Dim sMUTGenerate as string
-	sMUTGenerate = "Fme.exe GENERATE MAPINFO SHAPE " +
+	if iMIVersion >= 1200 Then
+		sMUTGenerate = "Fme.exe GENERATE MAPINFO SHAPE "
+	Else
+		sMUTGenerate = "Imut.exe CFGenerate MAPINFO SHAPE "
+	End if
+
+	sMUTGenerate = sMUTGenerate +
 		chr$(34) + sInputFile + chr$(34) + " " +
-		chr$(34) + sMappingFile + chr$(34) +
+		chr$(34) + sMappingFile + chr$(34)
+
+	if iMIVersion >= 1200 Then
+		sMUTGenerate = sMUTGenerate +
 		" --SourceSourceDataset " + 
 		chr$(34) + sInputFile + chr$(34) + " " +
 		" --DestDestDataset " + 
-		chr$(34) + sResultDir + chr$(34) + " " +
+		chr$(34) + sResultDir + chr$(34) + " "
+	End if
+
+	sMUTGenerate = sMUTGenerate +
 		" LOG_STANDARDOUT YES" +
-		" LOG_FILENAME " + Chr$(34) + sLogFile + chr$(34) +
-		" LOG_APPEND NO"
+		" LOG_FILENAME " + chr$(34) + sLogFile + chr$(34) +
+		" LOG_APPEND NO"	
 
 	'-------------------------------------------------
 	' Execute the command and wait for it to finish
@@ -84,11 +104,17 @@ Sub TranslateToShapefile(sDefaultPath As String, sLocalPath As String, sLocalNam
 	' file through the Universal Translator
 	'-------------------------------------------------
 	Dim sMUTRunCmd as string
-	sMUTRunCmd = "Fme.exe " + chr$(34) + sMappingFile + chr$(34)+
+	if iMIVersion >= 1200 Then
+		sMUTRunCmd = "Fme.exe " + chr$(34) + sMappingFile + chr$(34)
+	Else
+		sMUTRunCmd = "Imut.exe " + chr$(34) + sMappingFile + chr$(34)
+	End if
+
+	sMUTRunCmd = sMUTRunCmd +
 		" --HOMOGENOUS_GEOMETRY Yes" +
 		" --_SHAPE_FILE_TYPE 2d" +
 		" --SourceDataset " + chr$(34) + sInputFile + chr$(34) +
-		" --DestDataset " + Chr$(34) + sResultDir + chr$(34) +
+		" --DestDataset " + chr$(34) + sResultDir + chr$(34) +
 		" --_EXTENSION TAB" + 
 		" --_BASENAME " + sLocalName +
 		" --_FULLBASENAME " + sLocalName

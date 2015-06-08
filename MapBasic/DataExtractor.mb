@@ -1,7 +1,8 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012-2013 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2013, 2015 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2015 Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -19,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.51
+'* DataExtractor v1.52
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL species tables and
@@ -27,8 +28,18 @@
 '* which partners and which tables to process.
 '*
 '*
-'* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - September 2013
+'* Created:		Andy Foy - November 2012
+'* Last revised:	Andy Foy - June 2015
+'* 
+'* *****************  Version 1.52  *****************
+'* Author: Andy Foy		Date: 08/06/2015
+'* A. Added userid to temporary SQL table name to enable
+'*	concurrent use of tool.
+'* 
+'* *****************  Version 1.51  *****************
+'* Author: Andy Foy		Date: 01/1/2012
+'* A. Initial version of code based.
+'* 
 '***************************************************************
 Include "DataExtractor.def"
 
@@ -912,6 +923,13 @@ Sub SelectSpecies (ByVal nConn As Integer,
 	OnError Goto ErrorTrap
 
 	'-------------------------------------------------
+	' Get the current user ID
+	'-------------------------------------------------
+	Dim sUserID As String
+	sUserID = GetUserID()
+	sUserID = StringReplace(sUserID, " ", "_")
+
+	'-------------------------------------------------
 	' Check the partner requires something
 	'-------------------------------------------------
 	If UCase$(sExport) <> "YES" And
@@ -928,7 +946,7 @@ Sub SelectSpecies (ByVal nConn As Integer,
 	' Setup the temporary and local table names
 	'-------------------------------------------------
 	Dim sTempName, sLocalPath As String
-	sTempName = sTableName + "_temp"
+	sTempName = sTableName + "_" + sUserID
 	sLocalPath = sDefaultPath + "\" + sShortName
 	Call MyPrint("Processing table = '" + sTableName + "' ...")
 
@@ -941,7 +959,7 @@ Sub SelectSpecies (ByVal nConn As Integer,
 	Call MyPrint("Executing spatial selection ...")
 	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.usp_SelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
-	 + sPartnerName + "', '" + sShortName + "', '" + sTableName + "'")
+	 + sPartnerName + "', '" + sShortName + "', '" + sTableName + "', '" + sUserID + "'")
 	Call MyPrint("Spatial selection complete.")
 
 	'-------------------------------------------------
@@ -1048,10 +1066,98 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		End If
 
 		'-------------------------------------------------
+		' Set up the SQL statement for creating an empty
+		' temporary table (to check the record length)
+		'-------------------------------------------------
+		Dim sSQLStmt As String
+		sSQLStmt = "Select " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause + " AND GRPRECISION = -1"
+
+		'-------------------------------------------------
+		' Link the temporary table as a local table
+		'-------------------------------------------------
+		Call MyPrint("Linking dummy table ...")
+		Server nConn Link Table
+		sSQLStmt
+		Toolkit "ODBC"
+		Into sLocalName + "_" + sShortName
+		File sLocalPath + "\" + sLocalName
+		Autokey Off
+		ReadOnly
+
+		'-------------------------------------------------
+		' Get the table name alias of the new table
+		'-------------------------------------------------
+		Dim sTableAlias As String
+		sTableAlias = TableInfo(0, TAB_INFO_NAME)
+
+		'-------------------------------------------------
+		' Check if the maximum record length will be exceeded
+		'-------------------------------------------------
+		Dim iRowLength As Integer
+		iRowLength = GetRowLength(sTableAlias)
+		If iRowLength > 4096 Then
+
+			Call MyPrint("Record length exceeds maximum of 4096 bytes - selection cancelled.")
+			Note "Record length exceeds maximum of 4096 bytes - selection cancelled."
+
+			'-------------------------------------------------
+			' Drop the local table
+			'-------------------------------------------------
+			If TableIsOpen(sTableAlias) Then
+				Call MyPrint("Dropping local table ...")
+				Drop Table sTableAlias
+			End If
+
+			Exit Sub
+
+		Else
+			Call MyPrint("Total record length = " + iRowLength + " bytes")
+		End If
+
+		'-------------------------------------------------
+		' Check if the total data size will be exceeded
+		'-------------------------------------------------
+		Dim iDataSize As Integer
+		iDataSize = (iRowLength * iRecTotal) / 1024
+
+		If iDataSize > (1024*1024) Then
+
+			Call MyPrint("Total data size exceeds maximum of 2 Gb - selection cancelled.")
+			Note "Total data size exceeds maximum of 2 Gb - selection cancelled."
+
+			'-------------------------------------------------
+			' Drop the local table
+			'-------------------------------------------------
+			If TableIsOpen(sTableAlias) Then
+				Call MyPrint("Dropping local table ...")
+				Drop Table sTableAlias
+			End If
+
+			Exit Sub
+
+		Else
+			Call MyPrint("Total data size = " + iDataSize + " Kb")
+		End If
+
+		'-------------------------------------------------
+		' Unlink the temporary table to leave the local
+		' table as a regular standalone table
+		'-------------------------------------------------
+		Call MyPrint("Unlinking dummy table ...")
+		Unlink sTableAlias
+
+		'-------------------------------------------------
+		' Close the dummy table
+		'-------------------------------------------------
+		If TableIsOpen(sTableAlias) Then
+			Call MyPrint("Closing the dummy table ...")
+			Close Table sTableAlias
+		End If
+
+		'-------------------------------------------------
 		' Set up the SQL statement for extracting from
 		' the temporary table
 		'-------------------------------------------------
-		Dim sSQLStmt As String
 		sSQLStmt = "Select " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause
 
 		'-------------------------------------------------
@@ -1530,7 +1636,7 @@ Sub AboutBox
 '***************************************************************
 
 	Dialog
-		Title "About Data Extractor 1.51"
+		Title "About Data Extractor 1.52"
 		Width 230
 		Height 115
 
@@ -1550,7 +1656,7 @@ Sub AboutBox
 		Title "Created by Andy Foy Consulting."
 		Position 10,60
 	Control StaticText
-		Title "Copyright© 2012-2013 Greenspace Information for Greater London."
+		Title "Copyright© 2012-2013, 2015 GiGL."
 		Position 10,70
 	Control OKButton
 		Position 185,95
