@@ -1029,15 +1029,6 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		Server nStmt2 Close
 
 		'-------------------------------------------------
-		' Check if the maximum number of records will be
-		' exceeded
-		'-------------------------------------------------
-		If iRecTotal > iRecMax Then
-			Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
-			Goto NextClause
-		End If
-
-		'-------------------------------------------------
 		' Check if any records were extracted
 		'-------------------------------------------------
 		If iRecTotal = 0 Then
@@ -1046,6 +1037,15 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		End If
 
 		Call MyPrint("" + iRecTotal + " records to extract.")
+
+		'-------------------------------------------------
+		' Check if the maximum number of records will be
+		' exceeded
+		'-------------------------------------------------
+		If iRecTotal > iRecMax Then
+			Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
+			Goto NextClause
+		End If
 
 		'-------------------------------------------------
 		' Check if the temporary table is already/still open
@@ -1120,7 +1120,7 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		Dim iDataSize As Integer
 		iDataSize = (iRowLength * iRecTotal) / 1024
 
-		If iDataSize > (1024*1024) Then
+		If iDataSize > (2*1024*1024) Then
 
 			Call MyPrint("Total data size exceeds maximum of 2 Gb - selection cancelled.")
 			Note "Total data size exceeds maximum of 2 Gb - selection cancelled."
@@ -1228,6 +1228,11 @@ Sub SelectSpecies (ByVal nConn As Integer,
 				Dim sCmd As String
 				sCmd = "Commit Table " + sLocalName + "_" + sShortName
 				Run Command (sCmd)
+
+				'-------------------------------------------------
+				' Turn FastEdit off once updates are done
+				'-------------------------------------------------
+				Set Table sLocalName + "_" + sShortName FastEdit Off
 
 				Call MyPrint("Closing the MapInfo table ...")
 				Close Table sLocalName + "_" + sShortName
