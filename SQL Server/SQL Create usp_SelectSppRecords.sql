@@ -60,7 +60,7 @@ if exists (select ROUTINE_NAME from INFORMATION_SCHEMA.ROUTINES where ROUTINE_SC
 GO
 
 -- Create the stored procedure
-CREATE PROCEDURE dbo.usp_SelectSppRecords @Schema varchar(50), @PartnerTable varchar(50), @PartnerColumn varchar(50), @Partner varchar(50), @Abbrev varchar(50), @SpeciesTable varchar(50), @UserId varchar(50)
+CREATE PROCEDURE dbo.usp_SelectSppRecords @Schema varchar(50), @PartnerTable varchar(50), @PartnerColumn varchar(50), @Partner varchar(50), @Abbrev varchar(50), @SpeciesTable varchar(50), @UserId varchar(50) = 'temp'
 AS
 BEGIN
 
@@ -115,6 +115,7 @@ BEGIN
 		',EASTINGS ' +
 		',NORTHINGS ' +
       	',GRPRECISION ' +
+		',GRQUALIFIER ' +
 		',QUALIFIER ' +
 		',COMMENTS ' +
 		',BREEDING_STATUS ' +
@@ -157,6 +158,7 @@ BEGIN
 		',EASTINGS ' +
 		',NORTHINGS ' +
       	',GRPRECISION ' +
+		',GRQUALIFIER ' +
 		',QUALIFIER ' +
 		',COMMENTS ' +
 		',BREEDING_STATUS ' +
@@ -191,6 +193,7 @@ BEGIN
 		',Spp.[EASTINGS] ' +
 		',Spp.[NORTHINGS] ' +
       	',Spp.[GRPRECISION] ' +
+		',Spp.[GRQUALIFIER] ' +
 		',Spp.[QUALIFIER] ' +
 		',Spp.[COMMENTS] ' +
 		',Spp.[BREEDING_STATUS] ' +
