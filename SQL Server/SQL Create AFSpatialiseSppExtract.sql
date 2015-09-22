@@ -2,7 +2,7 @@
   DataExtractor is a MapInfo tool to extract biodiversity information
   from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
   
-  Copyright Â© 2012-2013 Andy Foy Consulting
+  Copyright © 2012-2013 Andy Foy Consulting
   
   This file is part of the MapInfo tool 'DataExtractor'.
   
@@ -35,73 +35,129 @@ GO
   Parameters:
 	@Schema			The schema for the table to be spatialised.
 	@Table			The name of the table to be spatialised.
-	@XColumn		The name of the column containing the record eastings.
 	@XMin			The minimum value for the eastings to be spatialised.
 	@XMin			The maximum value for the eastings to be spatialised.
-	@YColumn		The name of the column containing the record nothings.
 	@XMin			The minimum value for the nothings to be spatialised.
 	@XMin			The maximum value for the nothings to be spatialised.
-	@SizeColumn		The name of the column containing the record precision.
 	@SizeMin		The minimum value for the precision to be spatialised.
 	@SizeMax		The maximum value for the precision to be spatialised.
+	@PointMax		The maximum value for the precision when points will be
+					created instead of polygons.
+	@PointPos		The position for plotting points (1 = Lower Left,
+					2 = Mid, 3 = Upper Right)
 
   Created:	Nov 2012
 
-  Last revision information:
-    $Revision: 2 $
-    $Date: 02/04/13 $
-    $Author: Andy Foy $
+ *****************  Version 4  *****************
+ Author: Andy Foy		Date: 21/09/2015
+ A. Remove hard-coded column names.
+ B. Lookup table column names and spatial variables
+	from Spatial_Tables.
+
+ *****************  Version 3  *****************
+ Author: Andy Foy		Date: 04/06/2015
+ A. Add parameter for maximum size for plotting points.
+ B. Plot points at lower left position not mid cell.
 
 \*===========================================================================*/
 
 -- Drop the procedure if it already exists
-if exists (select ROUTINE_NAME from INFORMATION_SCHEMA.ROUTINES where ROUTINE_SCHEMA = 'dbo' and ROUTINE_NAME = 'usp_SpatialiseSppExtract')
-	DROP PROCEDURE dbo.usp_SpatialiseSppExtract
+if exists (select ROUTINE_NAME from INFORMATION_SCHEMA.ROUTINES where ROUTINE_SCHEMA = 'dbo' and ROUTINE_NAME = 'AFSpatialiseSppExtract')
+	DROP PROCEDURE dbo.AFSpatialiseSppExtract
 GO
 
 -- Create the stored procedure
-CREATE PROCEDURE dbo.usp_SpatialiseSppExtract @Schema varchar(50), @Table varchar(50), @XColumn varchar(50), @XMin Int, @XMax Int, @YColumn varchar(50), @YMin Int, @YMax Int, @SizeColumn varchar(50), @SizeMin Int, @SizeMax Int
+CREATE PROCEDURE dbo.AFSpatialiseSppExtract
+	@Schema varchar(50),
+	@Table varchar(50),
+	@XMin Int,
+	@XMax Int,
+	@YMin Int,
+	@YMax Int,
+	@SizeMin Int,
+	@SizeMax Int,
+	@PointMax Int,
+	@PointPos Int
+
 AS
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @debug int
-	Set @debug = 1
+	Set @debug = 0
+
+	If @PointPos IS NULL OR @PointPos NOT IN (1, 2, 3)
+		SET @PointPos = 1
 
 	If @debug = 1
 		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Started.'
 
-	DECLARE @sqlCommand varchar(2000)
+	DECLARE @sqlCommand nvarchar(2000)
+	DECLARE @params nvarchar(2000)
 
+	-- Lookup table column names and spatial variables from Spatial_Tables
+	DECLARE @IsSpatial bit
+	DECLARE @XColumn varchar(32), @YColumn varchar(32), @SizeColumn varchar(32), @SpatialColumn varchar(32)
+	DECLARE @SRID int, @CoordSystem varchar(254)
+	
+	If @debug = 1
+		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Retrieving table spatial details ...'
+
+	DECLARE @SpatialTable varchar(100)
+	SET @SpatialTable ='Spatial_Tables'
+
+	-- Retrieve the table column names and spatial variables
+	SET @sqlcommand = 'SELECT @O1 = XColumn, ' +
+							 '@O2 = YColumn, ' +
+							 '@O3 = SizeColumn, ' +
+							 '@O4 = IsSpatial, ' +
+							 '@O5 = SpatialColumn, ' +
+							 '@O6 = SRID, ' +
+							 '@O7 = CoordSystem ' +
+						'FROM ' + @Schema + '.' + @SpatialTable + ' ' +
+						'WHERE TableName = ''' + @Table + ''' AND OwnerName = ''' + @Schema + ''''
+
+	SET @params =	'@O1 varchar(32) OUTPUT, ' +
+					'@O2 varchar(32) OUTPUT, ' +
+					'@O3 varchar(32) OUTPUT, ' +
+					'@O4 bit OUTPUT, ' +
+					'@O5 varchar(32) OUTPUT, ' +
+					'@O6 int OUTPUT, ' +
+					'@O7 varchar(254) OUTPUT'
+		
+	EXEC sp_executesql @sqlcommand, @params,
+		@O1 = @XColumn OUTPUT, @O2 = @YColumn OUTPUT, @O3 = @SizeColumn OUTPUT, @O4 = @IsSpatial OUTPUT, 
+		@O5 = @SpatialColumn OUTPUT, @O6 = @SRID OUTPUT, @O7 = @CoordSystem OUTPUT
+	
 	-- Add a new non-clustered index on the XColumn field if it doesn't already exists
-	if not exists (select name from sys.indexes where name = 'IDX_' + @Table + '_' + @XColumn)
+	if not exists (select name from sys.indexes where name = 'IX_' + @XColumn)
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding XColumn field index ...'
 
-		Set @sqlCommand = 'CREATE INDEX IDX_' + @Table + '_' + @XColumn +
+		Set @sqlCommand = 'CREATE INDEX IX_' + @XColumn +
 			' ON ' + @Schema + '.' + @Table +' (' + @XColumn+ ')'
 		EXEC (@sqlcommand)
 	END
 	
 	-- Add a new non-clustered index on the YColumn field if it doesn't already exists
-	if not exists (select name from sys.indexes where name = 'IDX_' + @Table + '_' + @YColumn)
+	if not exists (select name from sys.indexes where name = 'IX_' + @YColumn)
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding YColumn field index ...'
 
-		Set @sqlCommand = 'CREATE INDEX IDX_' + @Table + '_' + @YColumn +
+		Set @sqlCommand = 'CREATE INDEX IX_' + @YColumn +
 			' ON ' + @Schema + '.' + @Table +' (' + @YColumn+ ')'
 		EXEC (@sqlcommand)
 	END
 
 	-- Add a new non-clustered index on the SizeColumn field if it doesn't already exists
-	if not exists (select name from sys.indexes where name = 'IDX_' + @Table + '_' + @SizeColumn)
+	if not exists (select name from sys.indexes where name = 'IX_' + @SizeColumn)
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding SizeColumn field index ...'
 
-		Set @sqlCommand = 'CREATE INDEX IDX_' + @Table + '_' + @SizeColumn +
+		Set @sqlCommand = 'CREATE INDEX IX_' + @SizeColumn +
 			' ON ' + @Schema + '.' + @Table +' (' + @SizeColumn+ ')'
 		EXEC (@sqlcommand)
 	END
@@ -129,24 +185,24 @@ BEGIN
 	END
 
 	-- Add a new geometry field if it doesn't already exists
-	if not exists (select column_name from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = @Schema and TABLE_NAME = @Table and COLUMN_NAME = 'SP_GEOMETRY')
+	if not exists (select column_name from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = @Schema and TABLE_NAME = @Table and COLUMN_NAME = @SpatialColumn)
 	BEGIN
 		If @debug = 1
-			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding new SP_GEOMETRY field ...'
+			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding new spatial field ...'
 
 		SET @sqlcommand = 'ALTER TABLE ' + @Schema + '.' + @Table +
-			' ADD SP_GEOMETRY Geometry'
+			' ADD ' + @SpatialColumn + ' Geometry'
 		EXEC (@sqlcommand)
 	END
 
 	-- Add a new sequential index on the primary key if it doesn't already exists
-	if not exists (select column_name from INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE where TABLE_SCHEMA = @Schema and TABLE_NAME = @Table and COLUMN_NAME = 'MI_PRINX' and CONSTRAINT_NAME = 'PK_' + @Table + '_MI_PRINX')
+	if not exists (select column_name from INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE where TABLE_SCHEMA = @Schema and TABLE_NAME = @Table and COLUMN_NAME = 'MI_PRINX' and CONSTRAINT_NAME = 'PK_MI_PRINX')
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding new primary index ...'
 
 		SET @sqlcommand = 'ALTER TABLE ' + @Schema + '.' + @Table +
-			' ADD CONSTRAINT PK_' + @Table + '_MI_PRINX' +
+			' ADD CONSTRAINT PK_MI_PRINX' +
 			' PRIMARY KEY(MI_PRINX)'
 		EXEC (@sqlcommand)
 	END
@@ -186,17 +242,17 @@ BEGIN
 		' AS SELECT ' + @XColumn + ' As XCOORD,' +
 		' ' + @YColumn + ' As YCOORD,' +
 		' ' + @SizeColumn + ' As GRIDSIZE,' +
-		' SP_GEOMETRY' +
+		' ' + @SpatialColumn + ' As SP_GEOMETRY' +
 		' FROM Species_Temp'
 	EXEC (@sqlcommand)
 
 	-- Drop the spatial index on the geometry field if it already exists
-	if exists (select name from sys.indexes where name = 'SIndex_' + @Table + '_SP_Geometry')
+	if exists (select name from sys.indexes where name = 'SIndex_SP_Geometry')
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Dropping the spatial index ...'
 
-		SET @sqlcommand = 'DROP INDEX SIndex_' + @Table + '_SP_Geometry ON ' + @Schema + '.' + @Table
+		SET @sqlcommand = 'DROP INDEX SIndex_SP_Geometry ON ' + @Schema + '.' + @Table
 		EXEC (@sqlcommand)
 	END
 
@@ -204,32 +260,63 @@ BEGIN
 		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Updating valid geometries ...'
 
 	-- Set the geometry for points based on the Xcolumn, YColumn and SizeColumn values
-	UPDATE Species_Temp_View
-		SET SP_GEOMETRY = geometry::STPointFromText('POINT(' +
-		dbo.ufn_ReturnMidEastings(XCOORD,GRIDSIZE) + ' ' + dbo.ufn_ReturnMidNorthings(YCOORD,GRIDSIZE) + ')', 27700)
-		WHERE XCOORD >= @XMin
-		AND XCOORD <= @XMax
-		AND YCOORD >= @YMin
-		AND YCOORD <= @YMax
-		AND GRIDSIZE >= @SizeMin
-		AND GRIDSIZE <= @SizeMax
-		AND GRIDSIZE <= 100
+	If @PointPos = 1
+	BEGIN
+		UPDATE Species_Temp_View
+			SET SP_GEOMETRY = geometry::STPointFromText('POINT(' +
+			dbo.AFReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnLowerNorthings(YCOORD,GRIDSIZE) + ')', @SRID)
+			WHERE XCOORD >= @XMin
+			AND XCOORD <= @XMax
+			AND YCOORD >= @YMin
+			AND YCOORD <= @YMax
+			AND GRIDSIZE >= @SizeMin
+			AND GRIDSIZE <= @SizeMax
+			AND GRIDSIZE <= @PointMax
+	END
+
+	If @PointPos = 2
+	BEGIN
+		UPDATE Species_Temp_View
+			SET SP_GEOMETRY = geometry::STPointFromText('POINT(' +
+			dbo.AFReturnMidEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnMidNorthings(YCOORD,GRIDSIZE) + ')', @SRID)
+			WHERE XCOORD >= @XMin
+			AND XCOORD <= @XMax
+			AND YCOORD >= @YMin
+			AND YCOORD <= @YMax
+			AND GRIDSIZE >= @SizeMin
+			AND GRIDSIZE <= @SizeMax
+			AND GRIDSIZE <= @PointMax
+	END
+
+	If @PointPos = 3
+	BEGIN
+		UPDATE Species_Temp_View
+			SET SP_GEOMETRY = geometry::STPointFromText('POINT(' +
+			dbo.AFReturnUpperEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnUpperNorthings(YCOORD,GRIDSIZE) + ')', @SRID)
+			WHERE XCOORD >= @XMin
+			AND XCOORD <= @XMax
+			AND YCOORD >= @YMin
+			AND YCOORD <= @YMax
+			AND GRIDSIZE >= @SizeMin
+			AND GRIDSIZE <= @SizeMax
+			AND GRIDSIZE <= @PointMax
+	END
 
 	-- Set the geometry for polygons based on the Xcolumn, YColumn and SizeColumn values
 	UPDATE Species_Temp_View
 		SET SP_GEOMETRY = geometry::STPolyFromText('POLYGON((' +
-		dbo.ufn_ReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.ufn_ReturnLowerNorthings(YCOORD,GRIDSIZE) + ', ' +
-		dbo.ufn_ReturnUpperEastings(XCOORD,GRIDSIZE) + ' ' + dbo.ufn_ReturnLowerNorthings(YCOORD,GRIDSIZE) + ', ' +
-		dbo.ufn_ReturnUpperEastings(XCOORD,GRIDSIZE) + ' ' + dbo.ufn_ReturnUpperNorthings(YCOORD,GRIDSIZE) + ', ' +
-		dbo.ufn_ReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.ufn_ReturnUpperNorthings(YCOORD,GRIDSIZE) + ', ' +
-		dbo.ufn_ReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.ufn_ReturnLowerNorthings(YCOORD,GRIDSIZE) + '))', 27700)
+		dbo.AFReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnLowerNorthings(YCOORD,GRIDSIZE) + ', ' +
+		dbo.AFReturnUpperEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnLowerNorthings(YCOORD,GRIDSIZE) + ', ' +
+		dbo.AFReturnUpperEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnUpperNorthings(YCOORD,GRIDSIZE) + ', ' +
+		dbo.AFReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnUpperNorthings(YCOORD,GRIDSIZE) + ', ' +
+		dbo.AFReturnLowerEastings(XCOORD,GRIDSIZE) + ' ' + dbo.AFReturnLowerNorthings(YCOORD,GRIDSIZE) + '))', @SRID)
 		WHERE XCOORD >= @XMin
 		AND XCOORD <= @XMax
 		AND YCOORD >= @YMin
 		AND YCOORD <= @YMax
 		AND GRIDSIZE >= @SizeMin
 		AND GRIDSIZE <= @SizeMax
-		AND GRIDSIZE > 100
+		AND GRIDSIZE > @PointMax
 
 	If @debug = 1
 		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Determining spatial extent ...'
@@ -253,7 +340,7 @@ BEGIN
 		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Creating spatial index ...'
 
 	-- Create the spatial index bounded by the geometric extent variables
-	SET @sqlcommand = 'CREATE SPATIAL INDEX SIndex_' + @Table + '_SP_Geometry ON ' + @Schema + '.' + @Table + ' ( SP_Geometry )' + 
+	SET @sqlcommand = 'CREATE SPATIAL INDEX SIndex_SP_Geometry ON ' + @Schema + '.' + @Table + ' ( SP_Geometry )' + 
 		' WITH ( ' +
 		' BOUNDING_BOX = (XMIN=' + CAST(@X1 As varchar) + ', YMIN=' + CAST(@Y1 As varchar) + ', XMAX=' + CAST(@X2 AS varchar) + ', YMAX=' + CAST(@Y2 As varchar) + '),' +
 		' GRIDS = (' +
@@ -314,15 +401,15 @@ BEGIN
 			,[VIEW_X_UR]
 			,[VIEW_Y_UR])
 		 VALUES
-			(17.2
+			(17.3
 			,@Table
 			,@Schema
-			,'SP_GEOMETRY'
+			,@SpatialColumn
 			,@X1
 			,@Y1
 			,@X2
 			,@Y2
-			,'Earth Projection 8, 79, "m", -2, 49, 0.9996012717, 400000, -100000 Bounds (-7845061.1011, -15524202.1641) (8645061.1011, 4470074.53373)'
+			,@CoordSystem
 			,'Pen (1,2,0)  Brush (1,16777215,16777215)'
 			,'NO_COLUMN'
 			,'NO_COLUMN'
