@@ -20,16 +20,26 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.52
+'* DataExtractor v1.53
 '*
 '* Creates a dialog window which lists the partners in the
-'* partner GIS table and also the SQL species tables and
+'* partner GIS table and also the SQL tables and
 '* MapInfo habitat tables and allows the user to select
 '* which partners and which tables to process.
 '*
 '*
 '* Created:		Andy Foy - November 2012
-'* Last revised:	Andy Foy - June 2015
+'* Last revised:	Andy Foy - September 2015
+'* 
+'* *****************  Version 1.53  *****************
+'* Author: Andy Foy		Date: 11/09/2015
+'* A. Call new SQL stored procedures to create and
+'*    clear selected subset tables.
+'* B. Check if result contains spatial data.
+'* C. Improved performance for setting symbology.
+'* D. Display numbers with thousand separators in log.
+'* E. Make log file user-specific to avoid concurrent
+'*    use problems/over-writes.
 '* 
 '* *****************  Version 1.52  *****************
 '* Author: Andy Foy		Date: 08/06/2015
@@ -112,8 +122,10 @@ Sub GetDefaultValues
 					' Load the default values from the child nodes
 					' under the DataExtractor node
 					'-------------------------------------------------
-					' Log file for storing output messages
-					sLogFileName = GetSingleNodeValue(hXMLNode, "LogFileName")
+					' File path for for storing the log file
+					Dim sLogFilePath As string
+					sLogFilePath = GetSingleNodeValue(hXMLNode, "LogFilePath")
+					sLogFileName = sLogFilePath & "\DataExtractor_" & sUserID & ".log"
 
 					' File DSN path and name containing remote SQL database connection settings
 					sFileDSN = GetSingleNodeValue(hXMLNode, "FileDSN")
@@ -148,7 +160,7 @@ Sub GetDefaultValues
 					' Name of column of Files list in the partner table
 					sFilesColumn = GetSingleNodeValue(hXMLNode, "FilesColumn")
 
-					' SQL used to list the names of species tables in the remote SQL database
+					' SQL used to list the names of SQL tables in the remote SQL database
 					sTableListSQL = GetSingleNodeValue(hXMLNode, "TableListSQL")
 
 					' Maximum number of records to be downloaded at one time
@@ -164,9 +176,9 @@ Sub GetDefaultValues
 					sConfidentialClause = GetSingleNodeValue(hXMLNode, "ConfidentialClause")
 
 					'-------------------------------------------------
-					' Get a handle on the SpeciesTables node
+					' Get a handle on the SQLTables node
 					'-------------------------------------------------
-					hXMLFilesNodeParent = MIXmlSelectSingleNode(hXMLNode, "SpeciesTables")
+					hXMLFilesNodeParent = MIXmlSelectSingleNode(hXMLNode, "SQLTables")
 
 					'-------------------------------------------------
 					' Get a handle on the node map of the above node
@@ -191,16 +203,16 @@ Sub GetDefaultValues
 						Redim aFileSppStmts(i)
 						Redim aFileSppClauses(i)
 
-						' Name of the Species node
+						' Name of the table node
 						aFileSppNodes(i) = GetNodeName(hXMLFilesNode)
 
 						' Name of the MapInfo table to be created
 						aFileSppTables(i) = GetSingleNodeValue(hXMLFilesNode, "TableName")
 
-						' SQL statement used to retrieve the required columns from the temporary species table
+						' SQL statement used to retrieve the required columns from the temporary SQL table
 						aFileSppStmts(i) = GetSingleNodeValue(hXMLFilesNode, "Columns")
 
-						' SQL clause used to retrieve the required rows from the temporary species table
+						' SQL clause used to retrieve the required rows from the temporary SQL table
 						aFileSppClauses(i) = GetSingleNodeValue(hXMLFilesNode, "Clauses")
 
 						'-------------------------------------------------
@@ -302,6 +314,13 @@ Sub OpenDialog
     OnError Goto ErrorTrap
 
 	'-------------------------------------------------
+	' Get the current user ID
+	'-------------------------------------------------
+	sUserID = GetUserID()
+	sUserID = StringReplace(sUserID, " ", "_")
+	sUserID = StringReplace(sUserID, ".", "_")
+
+	'-------------------------------------------------
 	' Retrieve the default values from the config file
 	'-------------------------------------------------
 	Call GetDefaultValues
@@ -329,9 +348,9 @@ Sub OpenDialog
 		Calling PartnerList_Handler
 
 	'-------------------------------------------------
-	' Add a SQL species table listbox
+	' Add a SQL table listbox
 	'-------------------------------------------------
-	Control StaticText Title "SQL Species Tables:"
+	Control StaticText Title "SQL Tables:"
 		Position 190,10
 	Control MultiListBox
 		ID 2
@@ -397,11 +416,25 @@ Sub OpenDialog
 		iExtractTot > 0 Then
 
 		'-------------------------------------------------
-		' Clear the log file
+		' Clear the log file (if it exists)
 		'-------------------------------------------------
 		If bClearLog = True Then
 			If FileExists(sLogFileName) Then
 				Kill sLogFileName
+			End If
+		End If
+
+		'-------------------------------------------------
+		' Clear the translate to shapefile log file
+		' (if it exists)
+		'-------------------------------------------------
+		If bClearLog = True Then
+			Dim sLogFilePath As String, sLogFileShp As String
+			sLogFilePath = PathToDirectory$(sLogFileName)
+			sLogFileShp = "TabToShp" + "_" + sUserID
+
+			If FileExists(sLogFilePath + "\" + sLogFileShp + "_MUT.log") Then
+				Kill sLogFilePath + "\" + sLogFileShp + "_MUT.log"
 			End If
 		End If
 
@@ -562,7 +595,7 @@ Sub DialogSetup
 	Alter Control 1 Title FROM Variable aPartners
 
 	'-------------------------------------------------
-	' Query all the species tables in the database
+	' Query all the tables in the database
 	'-------------------------------------------------
 	nStmt = Server_Execute(nConn, sTableListSQL)
 
@@ -575,14 +608,14 @@ Sub DialogSetup
 	Server nStmt Fetch Next
 
 	'-------------------------------------------------
-	' Loop through all the Species tables matching the
-	' SQL criteria and add them to the Species Tables list
+	' Loop through all the SQL tables matching the
+	' SQL criteria and add them to the SQL Tables list
 	'-------------------------------------------------
 	i = 1
 	While Not Server_Eot(nStmt)
 
 		'-------------------------------------------------
-		' Concatenate all the Species tables into an array
+		' Concatenate all the SQL tables into an array
 		'-------------------------------------------------
 		Redim aSQLTables(i)
 		aSQLTables(i) = aSQLTable
@@ -597,7 +630,7 @@ Sub DialogSetup
 	Server nStmt Close
 
 	'-------------------------------------------------
-	' Update the Species Table list to show the list
+	' Update the SQL Table list to show the list
 	' of tables
 	'-------------------------------------------------
 	Alter Control 2 Title FROM Variable aSQLTables
@@ -714,9 +747,9 @@ Sub CheckSelection
 	' Check if the user has selected at least one table
 	' from either of the table lists
 	'-------------------------------------------------
-	iSppTable = ReadControlValue(2)
+	iSQLTable = ReadControlValue(2)
 	iMapTable = ReadControlValue(3)
-	if iSppTable = 0 And iMapTable = 0 then
+	if iSQLTable = 0 And iMapTable = 0 then
 		Note "No tables have been selected!"
 		Exit Sub
 	End If
@@ -726,14 +759,14 @@ Sub CheckSelection
 	'-------------------------------------------------
 	iExtractCnt = 0
 	Do While iPartner > 0
-		Do While iSppTable > 0
+		Do While iSQLTable > 0
 			'-------------------------------------------------
 			' Increment the counter
 			'-------------------------------------------------
 			iExtractTot = iExtractTot + 1
 
 			aNodeSelected(iExtractTot) = ""
-			aTableSelected(iExtractTot) = aSQLTables(iSppTable)
+			aTableSelected(iExtractTot) = aSQLTables(iSQLTable)
 			aTableTypeSelected(iExtractTot) = "SQL"
 			aPartnerSelected(iExtractTot) = aPartners(iPartner)
 			aShortSelected(iExtractTot) = aShorts(iPartner)
@@ -744,7 +777,7 @@ Sub CheckSelection
 			'-------------------------------------------------
 			' Read the next table selected in the list
 			'-------------------------------------------------
-			iSppTable = ReadControlValue(2)
+			iSQLTable = ReadControlValue(2)
 		Loop
 
 		Do While iMapTable > 0
@@ -778,7 +811,7 @@ Sub CheckSelection
 		' Read the first SQL table selected
 		' in the list again
 		'-------------------------------------------------
-		iSppTable = ReadControlValue(2)
+		iSQLTable = ReadControlValue(2)
 
 		'-------------------------------------------------
 		' Read the first Map table selected
@@ -862,7 +895,7 @@ Sub ProcessExtracts
 		Else
 			Call MyPrint("Excluding confidential surveys ...")
 		End If
-		Call SelectSpecies(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, sTableName)
+		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, sTableName)
 	Else
 		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapStmt)
 	End If
@@ -906,7 +939,7 @@ Sub ProcessExtracts
 
 End Sub
 
-Sub SelectSpecies (ByVal nConn As Integer,
+Sub SelectSQL (ByVal nConn As Integer,
 	sPartnerName As String,
 	sShortName As String,
 	sFormat As String,
@@ -914,8 +947,8 @@ Sub SelectSpecies (ByVal nConn As Integer,
 	sFiles As String,
 	sTableName As String)
 '*************************************************
-'* Routine to select the species records from
-'* the table name passed in the call that
+'* Routine to select the records from the
+'* SQL table name passed in the call that
 '* intersect with the boundaries where the
 '* partner equals the value passed in the call.
 '*************************************************
@@ -928,6 +961,7 @@ Sub SelectSpecies (ByVal nConn As Integer,
 	Dim sUserID As String
 	sUserID = GetUserID()
 	sUserID = StringReplace(sUserID, " ", "_")
+	sUserID = StringReplace(sUserID, ".", "_")
 
 	'-------------------------------------------------
 	' Check the partner requires something
@@ -952,12 +986,12 @@ Sub SelectSpecies (ByVal nConn As Integer,
 
 	'-------------------------------------------------
 	' Execute the SQL Server stored procedure to select
-	' the species records intersecting with the current
+	' the records intersecting with the current
 	' partner boundary
 	'-------------------------------------------------
 	Dim nStmt1 As Integer
 	Call MyPrint("Executing spatial selection ...")
-	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.usp_SelectSppRecords '" + sDefaultSchema
+	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
 	 + sPartnerName + "', '" + sShortName + "', '" + sTableName + "', '" + sUserID + "'")
 	Call MyPrint("Spatial selection complete.")
@@ -1013,8 +1047,8 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		End If
 
 		'-------------------------------------------------
-		' Count the number of species records that have
-		' been selected in the output temporary table
+		' Count the number of records that have been
+		' selected in the output temporary table
 		'-------------------------------------------------
 		Dim nStmt2 As Integer
 		Dim iRecTotal As Integer
@@ -1036,14 +1070,14 @@ Sub SelectSpecies (ByVal nConn As Integer,
 			Goto NextClause
 		End If
 
-		Call MyPrint("" + iRecTotal + " records to extract.")
+		Call MyPrint("" + FormatNumber$(iRecTotal) + " records to extract.")
 
 		'-------------------------------------------------
 		' Check if the maximum number of records will be
 		' exceeded
 		'-------------------------------------------------
 		If iRecTotal > iRecMax Then
-			Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
+			Call MyPrint("Record count exceeds maximum of " + FormatNumber$(iRecMax) + " - extract skipped.")
 			Goto NextClause
 		End If
 
@@ -1070,7 +1104,7 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		' temporary table (to check the record length)
 		'-------------------------------------------------
 		Dim sSQLStmt As String
-		sSQLStmt = "Select " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause + " AND GRPRECISION = -1"
+		sSQLStmt = "Select Top(0) " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause
 
 		'-------------------------------------------------
 		' Link the temporary table as a local table
@@ -1091,14 +1125,37 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		sTableAlias = TableInfo(0, TAB_INFO_NAME)
 
 		'-------------------------------------------------
+		' Unlink the temporary table to leave the local
+		' table as a regular standalone table
+		'-------------------------------------------------
+		Call MyPrint("Unlinking dummy table ...")
+		Unlink sTableAlias
+
+		'-------------------------------------------------
+		' If the table contains a MI_STYLE column
+		' then delete the column
+		'-------------------------------------------------
+		If ColumnExists(sTableAlias, "MI_STYLE") Then
+			Alter Table sTableAlias (Drop MI_STYLE)
+		End If
+
+		'-------------------------------------------------
+		' If the table contains a MI_PRINX column
+		' then delete the column
+		'-------------------------------------------------
+		If ColumnExists(sTableAlias, "MI_PRINX") Then
+			Alter Table sTableAlias (Drop MI_PRINX)
+		End If
+
+		'-------------------------------------------------
 		' Check if the maximum record length will be exceeded
 		'-------------------------------------------------
 		Dim iRowLength As Integer
 		iRowLength = GetRowLength(sTableAlias)
 		If iRowLength > 4096 Then
 
-			Call MyPrint("Record length exceeds maximum of 4096 bytes - selection cancelled.")
-			Note "Record length exceeds maximum of 4096 bytes - selection cancelled."
+			Call MyPrint("Record length exceeds maximum of 4,096 bytes - selection cancelled.")
+			Note "Record length exceeds maximum of 4,096 bytes - selection cancelled."
 
 			'-------------------------------------------------
 			' Drop the local table
@@ -1111,15 +1168,28 @@ Sub SelectSpecies (ByVal nConn As Integer,
 			Exit Sub
 
 		Else
-			Call MyPrint("Total record length = " + iRowLength + " bytes")
+			Call MyPrint("Total record length = " + FormatNumber$(iRowLength) + " bytes")
+		End If
+
+		'-------------------------------------------------
+		' Display the total data size
+		'-------------------------------------------------
+		Dim iDataSize As Integer
+		iDataSize = (iRowLength * iRecTotal) / 1024
+
+		If iDataSize > (1024 * 1024) Then
+			Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / (1024 * 1024), 0.01)) + " Gb)")
+		Else
+			If iDataSize > 1024 Then
+				Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / 1024, 0.01)) + " Mb)")
+			Else
+				Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb")
+			End If
 		End If
 
 		'-------------------------------------------------
 		' Check if the total data size will be exceeded
 		'-------------------------------------------------
-		Dim iDataSize As Integer
-		iDataSize = (iRowLength * iRecTotal) / 1024
-
 		If iDataSize > (2*1024*1024) Then
 
 			Call MyPrint("Total data size exceeds maximum of 2 Gb - selection cancelled.")
@@ -1135,16 +1205,7 @@ Sub SelectSpecies (ByVal nConn As Integer,
 
 			Exit Sub
 
-		Else
-			Call MyPrint("Total data size = " + iDataSize + " Kb")
 		End If
-
-		'-------------------------------------------------
-		' Unlink the temporary table to leave the local
-		' table as a regular standalone table
-		'-------------------------------------------------
-		Call MyPrint("Unlinking dummy table ...")
-		Unlink sTableAlias
 
 		'-------------------------------------------------
 		' Close the dummy table
@@ -1173,69 +1234,142 @@ Sub SelectSpecies (ByVal nConn As Integer,
 		ReadOnly
 
 		'-------------------------------------------------
+		' Get the table name alias of the new table
+		'-------------------------------------------------
+		sTableAlias = TableInfo(0, TAB_INFO_NAME)
+
+		'-------------------------------------------------
 		' Unlink the temporary table to leave the local
 		' table as a regular standalone table
 		'-------------------------------------------------
 		Call MyPrint("Unlinking temporary table ...")
-		Unlink sLocalName + "_" + sShortName
+		Unlink sTableAlias
+
+		'-------------------------------------------------
+		' Check if the table contains an Obj column
+		' which indicates if there is any spatial data
+		'-------------------------------------------------
+		Dim bSpatialData As Logical
+		bSpatialData = True
+		'If ColumnExists(sTableAlias, "Obj") Then
+		If Not TableInfo(sTableAlias, TAB_INFO_MAPPABLE) Then
+			Call MyPrint("Table does not contain spatial data")
+			bSpatialData = False
+		End If
+
+		'-------------------------------------------------
+		' If the table contains a MI_STYLE column
+		' then delete the column
+		'-------------------------------------------------
+		If ColumnExists(sTableAlias, "MI_STYLE") Then
+			Alter Table sTableAlias (Drop MI_STYLE)
+		End If
+
+		'-------------------------------------------------
+		' If the table contains a MI_PRINX column
+		' then delete the column
+		'-------------------------------------------------
+		If ColumnExists(sTableAlias, "MI_PRINX") Then
+			Alter Table sTableAlias (Drop MI_PRINX)
+		End If
 
 		'-------------------------------------------------
 		' Also export the table as a CSV if required
 		'-------------------------------------------------
 		If UCase$(sExport) = "YES" Or UCase$(sExport) = "Y" Then
 			Call MyPrint("Exporting as a CSV ...")
+
+			Set ProgressBars Off
+
 			Export sLocalName + "_" + sShortName
 				Into sLocalPath + "\" + sLocalName + ".csv"
 				Type "CSV"
 				Titles
 				Overwrite
+
+			Set ProgressBars On
+
 		End If
 
 		'-------------------------------------------------
 		' Translate the table to ESRI shapefile if required
 		'-------------------------------------------------
 		If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
-			Call TranslateToShapefile(sDefaultPath, sLocalPath, sLocalName, sShortName)	
+			Dim sLogFilePath As String, sLogFileShp As String
+			sLogFilePath = PathToDirectory$(sLogFileName)
+			sLogFileShp = "TabToShp" + "_" + sUserID
+
+			'Call MyPrint("Log File Path = '" + sLogFilePath + "'")
+
+			Call TranslateToShapefile(sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
 		End If
 
 		'-------------------------------------------------
 		' If the partner requires a MapInfo table
 		'-------------------------------------------------
 		If UCase$(sFormat) = "TAB" Or UCase$(sFormat) = "BOTH" Then
+		
 			'-------------------------------------------------
-			' Check if the local table is open and close it
+			' Check if the local table is mappable (i.e.
+			' contains the 'OBJ' graphics column) and the
+			' graphics column contains spatial data
 			'-------------------------------------------------
-			If TableIsOpen(sLocalName + "_" + sShortName) Then
+			If TableInfo(sTableAlias, TAB_INFO_MAPPABLE)
+			And bSpatialData = True Then
 
 				'-------------------------------------------------
-				' Turn on FastEdit to speed up the updates
+				' Check if the local table is open
 				'-------------------------------------------------
-				Set Table sLocalName + "_" + sShortName FastEdit On
+				If TableIsOpen(sLocalName + "_" + sShortName) Then
 
-				'-------------------------------------------------
-				' Add an index to the precision field to speed
-				' up the symbology setting
-				'-------------------------------------------------
-				' Create Index On sLocalName + "_" + sShortName(GRPRECISION)
+					Call MyPrint("Setting symbology in table ...")
 
-				'-------------------------------------------------
-				' Set the symbology for the table before closing
-				'-------------------------------------------------
-				Call MyPrint("Setting symbology in table ...")
+					'-------------------------------------------------
+					' If the local table contains a GRPRECISION
+					' column (which the symbology is based on)
+					'-------------------------------------------------
 
-				Call SetSymbology(sNodeName, sLocalName, sShortName)
+					If ColumnExists(sTableAlias, "GRPRECISION") Then
 
-				Dim sCmd As String
-				sCmd = "Commit Table " + sLocalName + "_" + sShortName
-				Run Command (sCmd)
+						Set ProgressBars Off
 
-				'-------------------------------------------------
-				' Turn FastEdit off once updates are done
-				'-------------------------------------------------
-				Set Table sLocalName + "_" + sShortName FastEdit Off
+						'-------------------------------------------------
+						' Add an index to the precision field to speed
+						' up the symbology setting
+						'-------------------------------------------------
+						'Create Index On sLocalName + "_" + sShortName(GRPRECISION)
 
-				Call MyPrint("Closing the MapInfo table ...")
-				Close Table sLocalName + "_" + sShortName
+						'-------------------------------------------------
+						' Turn on FastEdit to speed up the updates
+						'-------------------------------------------------
+						Set Table sLocalName + "_" + sShortName FastEdit On
+
+						'-------------------------------------------------
+						' Set the symbology for the table before closing
+						'-------------------------------------------------
+						Call SetSymbology(sNodeName, sLocalName, sShortName)
+
+						Dim sCmd As String
+						sCmd = "Commit Table " + sLocalName + "_" + sShortName
+						Run Command (sCmd)
+
+						'-------------------------------------------------
+						' Turn FastEdit off once updates are done
+						'-------------------------------------------------
+						Set Table sLocalName + "_" + sShortName FastEdit Off
+
+						Call MyPrint("Closing the MapInfo table ...")
+						Close Table sLocalName + "_" + sShortName
+
+					Else
+
+						Call MyPrint("Table does not contain 'GRPRECISION' column - unable to set symbology.")
+						Note "Table does not contain 'GRPRECISION' column - unable to set symbology."
+
+					End If
+
+				End If
+
 			End If
 		Else
 			'-------------------------------------------------
@@ -1253,6 +1387,19 @@ Sub SelectSpecies (ByVal nConn As Integer,
 	'-------------------------------------------------
 NextClause:
 	Next
+
+	'-------------------------------------------------
+	' Execute a SQL Server stored procedure to delete
+	' the temporary SQL table
+	'-------------------------------------------------
+	Dim nStmt3 As Integer
+	nStmt3 = Server_Execute(nConn, "EXECUTE dbo.AFClearSppSubset '" + sDefaultSchema
+	+ "', '" + sTableName + "', '" + sUserID + "'")
+
+	'-------------------------------------------------
+	' Close the results
+	'-------------------------------------------------
+	Server nStmt3 Close
 
 	Exit Sub
 	
@@ -1273,7 +1420,7 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 	Dim hXMLDoc As MIXmlDocument
 	Dim hXMLRoot As MIXmlNode
 	Dim hXMLNode As MIXmlNode
-	Dim hXMLSpeciesTableNode As MIXmlNode
+	Dim hXMLSQLTableNode As MIXmlNode
 	Dim hXMLTableNode As MIXmlNode
 	Dim hXMLSymbologyNode As MIXmlNode
 	Dim hXMLSymbolNodeList As MIXMLNodeList
@@ -1307,14 +1454,14 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 	          If hXMLNode Then
 	
 					'-------------------------------------------------
-					' Get a handle on the SpeciesTables node
+					' Get a handle on the SQLTables node
 					'-------------------------------------------------
-					hXMLSpeciesTableNode = MIXmlSelectSingleNode(hXMLNode, "SpeciesTables")
+					hXMLSQLTableNode = MIXmlSelectSingleNode(hXMLNode, "SQLTables")
 
 					'-------------------------------------------------
-					' Get a handle on the current species table node
+					' Get a handle on the current SQL table node
 					'-------------------------------------------------
-					hXMLTableNode = MIXmlSelectSingleNode(hXMLSpeciesTableNode, sNodeName)
+					hXMLTableNode = MIXmlSelectSingleNode(hXMLSQLTableNode, sNodeName)
 
 					'-------------------------------------------------
 					' Get a handle on the symbology node for the table
@@ -1339,29 +1486,35 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 					i = 0
 					Do while hXMLSymbolNode
 						
+						'-------------------------------------------------
+						' Close the temporary NewStyle table if it is
+						' already/still open in the current MapInfo session
+						'-------------------------------------------------
+						If TableIsOpen("NewStyle") Then
+							Close Table NewStyle
+						End If
+
 						i = i + 1
-						' SQL clause used to retrieve the required rows from the species table
+
+						'-------------------------------------------------
+						' Set the SQL clause used to retrieve the
+						' required rows from the SQL table
+						'-------------------------------------------------
 						Dim sClause As String
 						sClause = GetSingleNodeValue(hXMLSymbolNode, "Clause")
 
-						' Type of object
+						'-------------------------------------------------
+						' Get the type of object (i.e. Point or Region)
+						'-------------------------------------------------
 						Dim sObject As String
 						sObject = GetSingleNodeValue(hXMLSymbolNode, "Object")
-
-						' Type of style
-						Dim sType As String
-						sType = GetSingleNodeValue(hXMLSymbolNode, "Type")
-
-						' Style of the symbol
-						Dim sStyle As String
-						sStyle = GetSingleNodeValue(hXMLSymbolNode, "Style")
 
 						'-------------------------------------------------
 						' Select all the rows of the desired object type
 						' matching the required SQL clause
 						'-------------------------------------------------
 						Dim sCmd As String
-						sCmd = "Select * From " + sLocalName + "_" + sShortName + " Where Str$(obj) = """ + sObject + """ And " + sClause + " Into NewStyle"
+						sCmd = "Select * From " + sLocalName + "_" + sShortName + " Where Str$(obj) = """ + sObject + """ And " + sClause + " Into NewStyle NoSelect"
 						Run Command (sCmd)
 
 						'-------------------------------------------------
@@ -1370,7 +1523,7 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 						Dim iRows As Integer
 						iRows = TableInfo(NewStyle, TAB_INFO_NROWS)
 
-						Call MyPrint("Setting " + sObject + " " + sType + " style for " + iRows + " rows where " + sClause)
+						Call MyPrint("Setting " + sObject + " style for " + FormatNumber$(iRows) + " rows where " + sClause)
 
 						'-------------------------------------------------
 						' If any rows were selected then set the styles
@@ -1378,59 +1531,36 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 						If iRows > 0 Then
 
 							'-------------------------------------------------
-							' Fetch the first of the selected rows
+							' Set the styles (depending on type of object)
 							'-------------------------------------------------
-							Fetch First from NewStyle
+							Dim sSymbol, sPen, sBrush As String
+							Dim stlSymbol As Symbol
+							Dim stlPen As Pen
+							Dim stlBrush As Brush
+
+							Do Case sObject
+								Case "Point"
+									sSymbol = GetSingleNodeValue(hXMLSymbolNode, "Symbol")
+									stlSymbol = STLText2Symbol(sSymbol)
+								Case "Region"
+									sPen = GetSingleNodeValue(hXMLSymbolNode, "Pen")
+									stlPen = STLText2Pen(sPen)
+									sBrush = GetSingleNodeValue(hXMLSymbolNode, "Brush")
+									stlBrush = STLText2Brush(sBrush)
+								Case Else
+							End Case
 
 							'-------------------------------------------------
-							' Loop through all the selected rows setting the
-							' symbology style
+							' Alter the object style depending on the object
+							' type and style type
 							'-------------------------------------------------
-							Dim x as Integer
-							x = 1
-								Do while x <= iRows
-								'-------------------------------------------------
-
-								' Set the current object to update
-								'-------------------------------------------------
-								Dim oUpdateObj as Object
-								oUpdateObj = NewStyle.obj
-
-								Dim stlSymbol As Symbol
-								Dim stlPen As Pen
-								Dim stlBrush As Brush
-
-								'-------------------------------------------------
-								' Alter the object style depending on the object
-								' type and style type
-								'-------------------------------------------------
-								Do Case sObject
-									Case "Point"
-										If sType = "Symbol" Then
-											stlSymbol = STLText2Symbol(sStyle)
-											Alter Object oUpdateObj Info OBJ_INFO_SYMBOL, stlSymbol
-										End If
-									Case "Region"
-										If sType = "Pen" Then
-											stlPen = STLText2Pen(sStyle)
-											Alter Object oUpdateObj Info OBJ_INFO_PEN, stlPen
-										End If
-										If sType = "Brush" Then
-											stlBrush = STLText2Brush(sStyle)
-											Alter Object oUpdateObj Info OBJ_INFO_BRUSH, stlBrush
-										End If
-									Case Else
-								End Case
-
-								Update NewStyle Set Obj = oUpdateObj Where RowID = x
-
-								'-------------------------------------------------
-								' Fetch the next of the selected rows
-								'-------------------------------------------------
-								Fetch next from NewStyle
-								x = x + 1
-
-							Loop
+							Do Case sObject
+								Case "Point"
+									Update NewStyle Set Obj = SetStylePoint(Obj, stlSymbol)
+								Case "Region"
+									Update NewStyle Set Obj = SetStylePolygon(Obj, stlPen, stlBrush)
+								Case Else
+							End Case
 
 						End If
 
@@ -1462,7 +1592,7 @@ CleanUp:
 	If hXMLSymbologyNode Then Call MIXmlNodeDestroy(hXMLSymbologyNode) End If
 	If hXMLTableNode Then Call MIXmlNodeDestroy(hXMLTableNode) End If
 
-	If hXMLSpeciesTableNode Then Call MIXmlNodeDestroy(hXMLSpeciesTableNode) End If
+	If hXMLSQLTableNode Then Call MIXmlNodeDestroy(hXMLSQLTableNode) End If
 	If hXMLNode Then Call MIXmlNodeDestroy(hXMLNode) End If
 	If hXMLRoot Then Call MIXmlNodeDestroy(hXMLRoot) End If
 	If hXMLDoc Then Call MIXmlDocumentDestroy(hXMLDoc) End If
@@ -1474,6 +1604,21 @@ GetSymbologyError:
 	Exit Sub
 
 End Sub
+
+Function SetStylePoint(ByVal oObj As Object, ByVal stlSymbol As Symbol) As Object
+
+	Alter Object oObj Info OBJ_INFO_SYMBOL, stlSymbol
+	SetStylePoint = oObj
+
+End Function
+
+Function SetStylePolygon(ByVal oObj As Object, ByVal stlPen As Pen, ByVal stlBrush As Brush) As Object
+
+	Alter Object oObj Info OBJ_INFO_PEN, stlPen
+	Alter Object oObj Info OBJ_INFO_BRUSH, stlBrush
+	SetStylePolygon = oObj
+
+End Function
 
 Sub SelectMaps (sPartnerName As String,
 	sShortName As String,
@@ -1491,6 +1636,12 @@ Sub SelectMaps (sPartnerName As String,
 '*************************************************
 
 	OnError Goto ErrorTrap
+
+	'-------------------------------------------------
+	' Setup the temporary and local table names
+	'-------------------------------------------------
+	Dim sTempName As String
+	sTempName = sTableName + "_" + sUserID
 
 	'-------------------------------------------------
 	' Check the partner requires something
@@ -1539,7 +1690,7 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	Call MyPrint("Executing spatial selection ...")
 	Dim sCmd As String
-	sCmd = "Select " + sMapStmt + " from " + sTableName + " Where obj Intersects (Select obj from " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") Into " + sLocalName + "_" + sShortName
+	sCmd = "Select " + sMapStmt + " from " + sTableName + " Where obj Intersects (Select obj from " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") Into " + sLocalName + "_" + sShortName + " NoSelect"
 	Run Command (sCmd)
 
 	'-------------------------------------------------
@@ -1568,7 +1719,7 @@ Sub SelectMaps (sPartnerName As String,
 		Exit Sub
 	End If
 
-	Call MyPrint("" + iRecTotal + " records selected.")
+	Call MyPrint("" + FormatNumber$(iRecTotal) + " records selected.")
 
 	'-------------------------------------------------
 	' Save the local table
@@ -1590,18 +1741,24 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	If UCase$(sExport) = "YES" Or UCase$(sExport) = "Y" Then
 		Call MyPrint("Exporting as a CSV ...")
+
+		Set ProgressBars Off
+
 		Export sLocalName + "_" + sShortName
 			Into sLocalPath + "\" + sLocalName + ".csv"
 			Type "CSV"
 			Titles
 			Overwrite
+
+		Set ProgressBars On
+
 	End If
 
 	'-------------------------------------------------
 	' Translate the table to ESRI shapefile if required
 	'-------------------------------------------------
 	If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
-		Call TranslateToShapefile(sDefaultPath, sLocalPath, sLocalName, sShortName)	
+		Call TranslateToShapefile(sDefaultPath, sLocalName, sShortName, sTempName)
 	End If
 
 	'-------------------------------------------------
@@ -1641,18 +1798,18 @@ Sub AboutBox
 '***************************************************************
 
 	Dialog
-		Title "About Data Extractor 1.52"
+		Title "About Data Extractor 1.53"
 		Width 230
 		Height 115
 
 	Control StaticText
-		Title "This program will extract GiGL species records and/or GIS"
+		Title "This program will extract GiGL SQL records and/or GIS"
 		Position 10,10
 	Control StaticText
 		Title "layers that intersect with partner boundary feature(s)."
 		Position 10,20
 	Control StaticText
-		Title "The user can select which GiGL species tables or GIS layers"
+		Title "The user can select which GiGL SQL tables or GIS layers"
 		Position 10,30
 	Control StaticText
 		Title "to extract and which partner boundaries to extract for."

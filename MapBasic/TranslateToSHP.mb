@@ -1,7 +1,8 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright Â© 2013 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2013 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2015 Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -19,18 +20,23 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* TranslateToSHP v1.4
+'* TranslateToSHP v1.41
 '*
 '* Contains functions to translate MapInfo .tab files into
 '* ESRI .shp files.
 '*
 '*
 '* Created:			Andy Foy - February 2013
-'* Last revised:	Andy Foy - April 2013
+'* Last revised:		Andy Foy - September 2015
+'*
+'* *****************  Version 1.41  *****************
+'* Author: Andy Foy		Date: 21/09/2015
+'* A. Store mapping and log files in the default path folder.
+'* 
 '***************************************************************
 Include "DataExtractor.def"
 
-Sub TranslateToShapefile(sDefaultPath As String, sLocalPath As String, sLocalName As String, sShortName As String)
+Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath As String, sLocalName As String)
 '*************************************************
 '* Routine to translate a MapInfo table name
 '* passed in the call into an ESRI shapefile
@@ -49,13 +55,24 @@ Sub TranslateToShapefile(sDefaultPath As String, sLocalPath As String, sLocalNam
 	Dim sResultDir as string
 	Dim sLogFile as string
 	
-	sInputFile = sLocalPath + "\" + sLocalName + ".TAB"
-	sResultDir = sLocalPath
-	sMappingFile = sDefaultPath + "\" + sLocalName + ".fme"
-	sLogFile = sDefaultPath + "\" + sLocalName + "_MUT.log"
+	If Right$(sLocalPath, 1) = "\" Then
+		sInputFile = sLocalPath + sLocalName + ".TAB"
+		sResultDir = Left$(sLocalPath, Len(sLocalPath) - 1)
+	Else
+		sInputFile = sLocalPath + "\" + sLocalName + ".TAB"
+		sResultDir = sLocalPath
+	End if
+
+	If Right$(sDefaultPath, 1) = "\" Then
+		sMappingFile = sDefaultPath + sTempName + ".fme"
+	Else
+		sMappingFile = sDefaultPath + "\" + sTempName + ".fme"
+	End if
+
+	sLogFile = sDefaultPath + "\" + sTempName + "_MUT.log"
 
 	Call AmendVersion(sInputFile)
-	
+
 	'-------------------------------------------------
 	' Get the version of MI currently running, multiplied
 	' by 100
@@ -87,8 +104,8 @@ Sub TranslateToShapefile(sDefaultPath As String, sLocalPath As String, sLocalNam
 
 	sMUTGenerate = sMUTGenerate +
 		" LOG_STANDARDOUT YES" +
-		" LOG_FILENAME " + chr$(34) + sLogFile + chr$(34) +
-		" LOG_APPEND NO"	
+		" LOG_FILENAME " + Chr$(34) + sLogFile + chr$(34) +
+		" LOG_APPEND YES"	
 
 	'-------------------------------------------------
 	' Execute the command and wait for it to finish

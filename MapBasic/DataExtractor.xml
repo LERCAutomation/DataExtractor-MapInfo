@@ -17,17 +17,16 @@ The 'DataExtractor' node contains all of the entries relating to the
 MapBasic tool variables.
 
 Each entry relates to a file, folder, table name, column name or SQL statement
-used by the MapBasic tool to select and export species data for the GiGL
-partners.
+used by the MapBasic tool to select and export data for the GiGL partners.
 -->
 
 <configuration>
 <DataExtractor>
 
-  <!-- The name of the log file used by the tool to output messages -->
-  <LogFileName>
-	<value>D:\LRCs\GiGL\Data Exchange\Extracts\DataExtractor.log</value>
-  </LogFileName>
+  <!-- The existing file location where log files will be saved with output messages -->
+  <LogFilePath>
+	<value>D:\LRCs\GiGL\Data Exchange\Logs</value>
+  </LogFilePath>
 
   <!-- The location of the File DSN that specifies which SQL Server database to connect to -->
   <FileDSN>
@@ -44,20 +43,20 @@ partners.
 	<value>dbo</value>
   </DatabaseSchema>
 
-  <!-- The name of the partner GIS layer in SQL Server used to select the species records -->
+  <!-- The name of the partner GIS layer in SQL Server used to select the records -->
   <PartnerTable>
 	<value>CombinedExtractPolygons</value>
   </PartnerTable>
 
   <!-- The name of the column in the partner GIS layer containing the partner name passed to SQL
-       Server by the tool to use as the partner's boundary for selecting the species records -->
+       Server by the tool to use as the partner's boundary for selecting the records -->
   <PartnerColumn>
 	<value>PartnerName</value>
   </PartnerColumn>
 
   <!-- The name of the column in the partner GIS layer containing the abbreviated name passed to
        SQL Server by the tool to use as the sub-folder name for the destination of extracted
-       species records -->
+       records -->
   <ShortColumn>
 	<value>ShortName</value>
   </ShortColumn>
@@ -75,7 +74,7 @@ partners.
   </ActiveColumn>
 
   <!-- The name of the column in the partner GIS layer containing the GIS format required for
-       the output species records -->
+       the output records -->
   <FormatColumn>
 	<value>GISformat</value>
   </FormatColumn>
@@ -92,7 +91,7 @@ partners.
 	<value>Files</value>
   </FilesColumn>
 
-  <!-- The SQL statement used to list all the species tables in SQL Server that can be selected
+  <!-- The SQL statement used to list all the tables in SQL Server that can be selected
        by the user to extract for each partner -->
   <TableListSQL>
 	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL[_]Spp[_]%' And table_name Not Like 'GiGL[_]Spp[_]%[_]%' Order By table_name</value>
@@ -108,19 +107,19 @@ partners.
 	<value>Yes</value>
   </ZipDefault>
 
-  <!-- The SQL criteria for excluding any confidential species surveys -->
+  <!-- The SQL criteria for excluding any confidential surveys -->
   <ConfidentialClause>
 	<value> AND R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
   </ConfidentialClause>
 
-  <!-- The default value for extracting confidential species surveys -->
+  <!-- The default value for extracting confidential surveys -->
   <ConfidentialDefault>
 	<value>No</value>
   </ConfidentialDefault>
 
   <!-- The table columns and SQL where clauses used to select all the required columns for
-	the species extract tables -->
-  <SpeciesTables>
+	the extract tables -->
+  <SQLTables>
 	<GiGL_AllSpp>
 		<TableName>
 			<Value>GiGL_Species_All</Value>
@@ -546,7 +545,7 @@ partners.
 			</Symbol>
 		</Symbology>
 	</GiGL_HistoricSpp>
-  </SpeciesTables>
+  </SQLTables>
 
   <!-- The names and local names of the map tables and the required columns for the map tables -->
   <MapTables>

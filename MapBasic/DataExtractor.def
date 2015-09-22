@@ -87,7 +87,7 @@ Declare Sub OpenDialog
 Declare Sub DialogSetup
 Declare Sub PartnerList_Handler
 Declare Sub CheckSelection
-Declare Sub SelectSpecies
+Declare Sub SelectSQL
 	(ByVal nConn As Integer,
 	sPartnerName As String,
 	sShortName As String,
@@ -142,6 +142,9 @@ Declare Function TableIsOpen
 	(ByVal sTabName As String) As Logical
 Declare Function GetRowLength
 	(ByVal sTableName As String) As Integer
+Declare Function ColumnExists
+	(ByVal sTableName As String,
+	ByVal sColName As String) As Logical
 Declare Function ExecuteAndWait
 	(ByVal cmdLine as string) As Integer
 Declare Function ZipFiles
@@ -154,6 +157,13 @@ Declare Function GetNodeName(
 	ByVal hNode As MIXmlNode) As String
 Declare Function GetNodeAttribute(
 	ByVal hNode As MIXmlNode) As String
+Declare Function SetStylePoint(
+	ByVal oObj As Object,
+	ByVal stlSymbol As Symbol) As Object
+Declare Function SetStylePolygon(
+	ByVal oObj As Object,
+	ByVal stlPen As Pen,
+	ByVal stlBrush As Brush) As Object
 
 Declare Function CreateDirectory Lib "kernel32"
 	Alias "CreateDirectoryA"
@@ -252,6 +262,7 @@ Declare Function MIGetErrorCode Lib MIWEBSERVICES_LIB_NAME
 '-------------------------------------------------
 ' Declare the global variables
 '-------------------------------------------------
+Global sUserId As String
 Global sDefaultPath As String
 Global sFileDSN As String
 Global sDefaultSchema As String
@@ -266,6 +277,11 @@ Global sExportColumn As String
 Global sFilesColumn As String
 Global sPartnerListSQL As String
 Global sLogFileName As String
+Global bSpatialTables As Logical
+Global sDefaultPointPrecision As String
+Global sEastingCol As String
+Global sNorthingCol As String
+Global sPrecisionCol As String
 
 Global aPartners(199) As String
 Global aShorts(199) As String
@@ -302,7 +318,7 @@ Global aMapStmtSelected(999) As String
 Global iExtractTot As Integer
 Global iExtractCnt As Integer
 Global iPartner As Integer
-Global iSppTable As Integer
+Global iSQLTable As Integer
 Global iMapTable As Integer
 Global nConn As Integer
 Global iRecMax As Integer

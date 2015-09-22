@@ -20,13 +20,18 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* GenFunctions v1.41
+'* GenFunctions v1.42
 '*
 '* Contains general functions used by the DataExtractor tool.
 '*
 '*
 '* Created:		Andy Foy - February 2013
-'* Last revised:	Andy Foy - April 2013
+'* Last revised:	Andy Foy - September 2015
+'* 
+'* *****************  Version 1.42  *****************
+'* Author: Andy Foy		Date: 11/09/2015
+'* A. Added function to check existence of column in
+'*    table.
 '* 
 '* *****************  Version 1.41  *****************
 '* Author: Andy Foy		Date: 08/06/2015
@@ -68,6 +73,32 @@ Function TableIsOpen (ByVal sTabName As String) As Logical
 			TableIsOpen = TRUE
 			Exit Function
 		End If
+	Next
+
+End Function
+
+Function ColumnExists(ByVal sTableName As String, ByVal sColName As String) As Logical
+'*************************************************
+'* Check if the column exists in the table
+'*************************************************
+
+	'-------------------------------------------------
+	' Loop through all the columns looking for the
+	' required name
+	'-------------------------------------------------
+	Dim i, j As Integer
+	Dim sColName0 As String
+
+	ColumnExists = False
+
+	For i = 1 to TableInfo(sTableName, TAB_INFO_NCOLS)
+ 
+       sColName0 = ColumnInfo(sTableName, "col"&i, COL_INFO_NAME)
+		If UCase$(sColName) = UCase$(sColName0) Then
+ 			ColumnExists = True
+			Exit For
+		End If
+
 	Next
 
 End Function
