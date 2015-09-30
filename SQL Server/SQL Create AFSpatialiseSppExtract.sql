@@ -130,34 +130,34 @@ BEGIN
 		@O5 = @SpatialColumn OUTPUT, @O6 = @SRID OUTPUT, @O7 = @CoordSystem OUTPUT
 	
 	-- Add a new non-clustered index on the XColumn field if it doesn't already exists
-	if not exists (select name from sys.indexes where name = 'IX_' + @XColumn)
+	if not exists (select name from sys.indexes where name = 'IX_' + @Table + '_' + @XColumn)
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding XColumn field index ...'
 
-		Set @sqlCommand = 'CREATE INDEX IX_' + @XColumn +
+		Set @sqlCommand = 'CREATE INDEX IX_' + @Table + '_' + @XColumn +
 			' ON ' + @Schema + '.' + @Table +' (' + @XColumn+ ')'
 		EXEC (@sqlcommand)
 	END
 	
 	-- Add a new non-clustered index on the YColumn field if it doesn't already exists
-	if not exists (select name from sys.indexes where name = 'IX_' + @YColumn)
+	if not exists (select name from sys.indexes where name = 'IX_' + @Table + '_' + @YColumn)
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding YColumn field index ...'
 
-		Set @sqlCommand = 'CREATE INDEX IX_' + @YColumn +
+		Set @sqlCommand = 'CREATE INDEX IX_' + @Table + '_' + @YColumn +
 			' ON ' + @Schema + '.' + @Table +' (' + @YColumn+ ')'
 		EXEC (@sqlcommand)
 	END
 
 	-- Add a new non-clustered index on the SizeColumn field if it doesn't already exists
-	if not exists (select name from sys.indexes where name = 'IX_' + @SizeColumn)
+	if not exists (select name from sys.indexes where name = 'IX_' + @Table + '_' + @SizeColumn)
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding SizeColumn field index ...'
 
-		Set @sqlCommand = 'CREATE INDEX IX_' + @SizeColumn +
+		Set @sqlCommand = 'CREATE INDEX IX_' + @Table + '_' + @SizeColumn +
 			' ON ' + @Schema + '.' + @Table +' (' + @SizeColumn+ ')'
 		EXEC (@sqlcommand)
 	END
@@ -196,13 +196,13 @@ BEGIN
 	END
 
 	-- Add a new sequential index on the primary key if it doesn't already exists
-	if not exists (select column_name from INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE where TABLE_SCHEMA = @Schema and TABLE_NAME = @Table and COLUMN_NAME = 'MI_PRINX' and CONSTRAINT_NAME = 'PK_MI_PRINX')
+	if not exists (select column_name from INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE where TABLE_SCHEMA = @Schema and TABLE_NAME = @Table and COLUMN_NAME = 'MI_PRINX' and CONSTRAINT_NAME = 'PK_' + @Table + '_MI_PRINX')
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Adding new primary index ...'
 
 		SET @sqlcommand = 'ALTER TABLE ' + @Schema + '.' + @Table +
-			' ADD CONSTRAINT PK_MI_PRINX' +
+			' ADD CONSTRAINT PK_' + @Table + '_MI_PRINX' +
 			' PRIMARY KEY(MI_PRINX)'
 		EXEC (@sqlcommand)
 	END
@@ -247,12 +247,12 @@ BEGIN
 	EXEC (@sqlcommand)
 
 	-- Drop the spatial index on the geometry field if it already exists
-	if exists (select name from sys.indexes where name = 'SIndex_SP_Geometry')
+	if exists (select name from sys.indexes where name = 'SIndex_' + @Table + '_SP_Geometry')
 	BEGIN
 		If @debug = 1
 			PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Dropping the spatial index ...'
 
-		SET @sqlcommand = 'DROP INDEX SIndex_SP_Geometry ON ' + @Schema + '.' + @Table
+		SET @sqlcommand = 'DROP INDEX SIndex_' + @Table + '_SP_Geometry ON ' + @Schema + '.' + @Table
 		EXEC (@sqlcommand)
 	END
 
@@ -340,7 +340,7 @@ BEGIN
 		PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Creating spatial index ...'
 
 	-- Create the spatial index bounded by the geometric extent variables
-	SET @sqlcommand = 'CREATE SPATIAL INDEX SIndex_SP_Geometry ON ' + @Schema + '.' + @Table + ' ( SP_Geometry )' + 
+	SET @sqlcommand = 'CREATE SPATIAL INDEX SIndex_' + @Table + '_SP_Geometry ON ' + @Schema + '.' + @Table + ' ( SP_Geometry )' + 
 		' WITH ( ' +
 		' BOUNDING_BOX = (XMIN=' + CAST(@X1 As varchar) + ', YMIN=' + CAST(@Y1 As varchar) + ', XMAX=' + CAST(@X2 AS varchar) + ', YMAX=' + CAST(@Y2 As varchar) + '),' +
 		' GRIDS = (' +
