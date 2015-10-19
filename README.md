@@ -1,10 +1,10 @@
 Data Extractor
 ==============
 
-Data Extractor Tool v1.51
+Data Extractor Tool v1.53
 
-Copyright © 2012-2013 Greenspace Information for Greater London (GiGL)
-Copyright © 2012-2013 Andy Foy Consulting
+Copyright © 2012-2013 GiGL
+Copyright © 2015 TVERC, GiGL
 
 Overview
 --------
