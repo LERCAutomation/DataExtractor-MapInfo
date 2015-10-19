@@ -2,7 +2,7 @@
   DataExtractor is a MapInfo tool to extract biodiversity information
   from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
   
-  Copyright © 2012-2013 Andy Foy Consulting
+  Copyright © 2012-2013, 2015 Andy Foy Consulting
   
   This file is part of the MapInfo tool 'DataExtractor'.
   

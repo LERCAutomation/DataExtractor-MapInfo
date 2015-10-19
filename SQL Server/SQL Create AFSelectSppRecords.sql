@@ -97,10 +97,10 @@ BEGIN
 	SET @TempTable = @SpeciesTable + '_' + @UserId
 
 	-- Drop the index on the sequential primary key of the temporary table if it already exists
-	If EXISTS (SELECT column_name FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE TABLE_SCHEMA = @Schema AND TABLE_NAME = @TempTable AND COLUMN_NAME = 'MI_PRINX' AND CONSTRAINT_NAME = 'PK_MI_PRINX')
+	If EXISTS (SELECT column_name FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE TABLE_SCHEMA = @Schema AND TABLE_NAME = @TempTable AND COLUMN_NAME = 'MI_PRINX' AND CONSTRAINT_NAME = 'PK_' + @TempTable + '_MI_PRINX')
 	BEGIN
 		SET @sqlcommand = 'ALTER TABLE ' + @Schema + '.' + @TempTable +
-			' DROP CONSTRAINT PK_MI_PRINX'
+			' DROP CONSTRAINT PK_' + @TempTable + '_MI_PRINX'
 		EXEC (@sqlcommand)
 	END
 	
@@ -160,7 +160,7 @@ BEGIN
 		' INTO ' + @Schema + '.' + @TempTable +
 		' FROM ' + @Schema + '.' + @SpeciesTable + ' As Spp, ' + @PartnerTable + ' As Poly' +
 		' WHERE Poly.' + @PartnerColumn + ' = ''' + @Partner + '''' +
-		' AND Spp.SP_GEOMETRY.STIntersects(Poly.SP_GEOMETRY) = 1' +
+		' AND Spp.' + @SpatialColumn + '.STIntersects(Poly.SP_GEOMETRY) = 1' +
 		' AND Poly.SP_GEOMETRY IS NOT NULL'
 	EXEC (@sqlcommand)
 
@@ -222,13 +222,6 @@ BEGIN
 		
 			If @debug = 1
 				PRINT CONVERT(VARCHAR(32), CURRENT_TIMESTAMP, 109 ) + ' : ' + 'Inserting the MapInfo MapCatalog entry ...'
-
-			---- Check if the spatial column is in the table
-			--IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'SP_GEOMETRY' AND Object_ID = Object_ID(@TempTable))
-			--BEGIN
-			--	SET @sqlcommand = 'ALTER TABLE ' + @TempTable + ' ADD SP_GEOMETRY Geometry NULL'
-			--	EXEC (@sqlcommand)
-			--END
 
 			-- Check if the rendition column is in the table
 			IF NOT EXISTS(SELECT * FROM sys.columns WHERE Name = N'MI_STYLE' AND Object_ID = Object_ID(@TempTable))
