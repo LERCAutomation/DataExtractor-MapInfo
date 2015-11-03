@@ -1,8 +1,8 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2013, 2015 Greenspace Information for Greater London (GiGL)
-'* Copyright © 2015 Andy Foy Consulting
+'* Copyright © 2013, 2015 GiGL
+'* Copyright © 2015 TVERC & GiGL
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
