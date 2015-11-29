@@ -36,6 +36,7 @@ GO
 	@Schema			The schema for the partner and species table.
 	@PartnerTable	The name of the partner table used for selecting.
 	@PartnerColumn	The name of the column containing the partner to be used.
+	@Partner		The partner to be used for selecting.
 	@AbbrevColumn	The name of the column containing the partner abbreviation.
 	@SpeciesTable	The name of the table contain the species records.
 	@UserId			The userid of the user executing the selection.

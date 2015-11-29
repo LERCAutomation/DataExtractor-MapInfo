@@ -1175,7 +1175,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' Display the total data size
 		'-------------------------------------------------
 		Dim iDataSize As Integer
-		iDataSize = (iRowLength * iRecTotal) / 1024
+		iDataSize = ((iRowLength * iRecTotal) / 1024) + 1
 
 		If iDataSize > (1024 * 1024) Then
 			Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / (1024 * 1024), 0.01)) + " Gb)")
