@@ -16,13 +16,13 @@ The Data Extractor Tool requires the following:
 
  - MapInfo 10.0 or higher
 
- - Microsoft SQL Server 2008 Express Edition R2 or later, OR
- - Microsoft SQL Server 2008 R2 or later
+ - Microsoft SQL Server 2008 Express Edition or later, OR
+ - Microsoft SQL Server 2008 or later
 
 Source Code
 -----------
 The source code for the Data Extractor Tool is open source and can be downloaded from:
-<https://github.com/LRCAutomation/Data-Extractor>
+<https://github.com/LERCAutomation/DataExtractor-MapInfo>
 
 License Information
 -------------------

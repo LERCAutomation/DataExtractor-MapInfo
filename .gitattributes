@@ -1,0 +1,12 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Standard to msysgit
+*.mb	 diff=astextplain
+*.MB	 diff=astextplain
+*.def  diff=astextplain
+*.DEF  diff=astextplain
+*.xml  diff=astextplain
+*.XML  diff=astextplain
+*.vbs  diff=astextplain
+*.VBS  diff=astextplain
