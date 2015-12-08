@@ -94,6 +94,7 @@ Declare Sub SelectSQL
 	sFormat As String,
 	sExport As String,
 	sFiles As String,
+	iSelectType As Integer,
 	sTableName As String)
 Declare Sub SetSymbology
 	(sNodeName As String,
@@ -262,7 +263,9 @@ Declare Function MIGetErrorCode Lib MIWEBSERVICES_LIB_NAME
 '-------------------------------------------------
 ' Declare the global variables
 '-------------------------------------------------
+Global sVersion As String
 Global sUserId As String
+
 Global sDefaultPath As String
 Global sFileDSN As String
 Global sDefaultSchema As String
@@ -275,6 +278,14 @@ Global sActiveColumn As String
 Global sFormatColumn As String
 Global sExportColumn As String
 Global sFilesColumn As String
+Global sTagsColumn As String
+Global sSelectTypeOptions As String
+Global iDefaultSelectType As Integer
+Global iRecMax As Integer
+Global sDefaultZip As String
+Global sConfidentialClause As String
+Global sDefaultConfidential As String
+
 Global sPartnerListSQL As String
 Global sLogFileName As String
 Global bSpatialTables As Logical
@@ -291,8 +302,6 @@ Global aExports(199) As String
 Global aFiles(199) As String
 
 Global aSQLTables(99) As String
-'Global aSppNodes(99) As String
-'Global aSppTables(99) As String
 Global aMapNodes(99) As String
 Global aMapTables(99) As String
 Global aMapStmts(99) As String
@@ -301,6 +310,7 @@ Global aFileSppNodes(99) As String
 Global aFileSppTables(99) As String
 Global aFileSppStmts(99) As String
 Global aFileSppClauses(99) As String
+
 Global aFileMapNodes(99) As String
 Global aFileMapTables(99) As String
 Global aFileMapStmts(99) As String
@@ -321,11 +331,9 @@ Global iPartner As Integer
 Global iSQLTable As Integer
 Global iMapTable As Integer
 Global nConn As Integer
-Global iRecMax As Integer
-Global sZipDefault As String
 Global bZipFiles As Logical
-Global sConfidentialDefault As String
 Global bConfidentialSurveys As Logical
-Global sConfidentialClause As String
 Global bClearLog As Logical
+Global iSelectType As Integer
+
 Global sLastShortName As String

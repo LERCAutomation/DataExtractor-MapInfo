@@ -43,6 +43,12 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 	<value>dbo</value>
   </DatabaseSchema>
 
+  <!-- The SQL statement used to list all the tables in SQL Server that can be selected
+       by the user to extract for each partner -->
+  <TableListSQL>
+	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL[_]Spp[_]%' And table_name Not Like 'GiGL[_]Spp[_]%[_]%' Order By table_name</value>
+  </TableListSQL>
+
   <!-- The name of the partner GIS layer in SQL Server used to select the records -->
   <PartnerTable>
 	<value>CombinedExtractPolygons</value>
@@ -91,11 +97,21 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 	<value>Files</value>
   </FilesColumn>
 
-  <!-- The SQL statement used to list all the tables in SQL Server that can be selected
-       by the user to extract for each partner -->
-  <TableListSQL>
-	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL[_]Spp[_]%' And table_name Not Like 'GiGL[_]Spp[_]%[_]%' Order By table_name</value>
-  </TableListSQL>
+  <!-- The name of the column in the partner GIS layer indicating which survey tags, if any
+       should be included in the export -->
+  <TagsColumn>
+	<value>PartnerTags</value>
+  </TagsColumn>
+
+	<!-- The options for the selection types -->
+  <SelectTypeOptions>
+	<value>Spatial Only;Survey Tags Only;Spatial and Survey Tags</value>
+  </SelectTypeOptions>
+
+  <!-- The default selection type (1 = spatial, 2 = tags, 3 = both) -->
+  <DefaultSelectType>
+	<value>3</value>
+  </DefaultSelectType>
 
   <!-- The maximum number of records what will be extracted in any one partner extract -->
   <RecMax>
@@ -103,9 +119,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
   </RecMax>
 
   <!-- The default value for zipping the extract files -->
-  <ZipDefault>
+  <DefaultZip>
 	<value>Yes</value>
-  </ZipDefault>
+  </DefaultZip>
 
   <!-- The SQL criteria for excluding any confidential surveys -->
   <ConfidentialClause>
@@ -113,9 +129,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
   </ConfidentialClause>
 
   <!-- The default value for extracting confidential surveys -->
-  <ConfidentialDefault>
+  <DefaultConfidential>
 	<value>No</value>
-  </ConfidentialDefault>
+  </DefaultConfidential>
 
   <!-- The table columns and SQL where clauses used to select all the required columns for
 	the extract tables -->

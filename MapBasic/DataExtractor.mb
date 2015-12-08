@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.53
+'* DataExtractor v1.54
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,8 +29,13 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - September 2015
+'* Last revised:	Andy Foy - December 2015
 '* 
+'* *****************  Version 1.53  *****************
+'* Author: Andy Foy		Date: 08/12/2015
+'* A. Pass tags column to SQL stored procedure to also
+'*    select records based on their survey tags.
+'*
 '* *****************  Version 1.53  *****************
 '* Author: Andy Foy		Date: 11/09/2015
 '* A. Call new SQL stored procedures to create and
@@ -57,6 +62,11 @@ Sub Main
 '***************************************************************
 '* Main sub-routine
 '***************************************************************
+
+	'-------------------------------------------------
+	' Set the version number
+	'-------------------------------------------------
+	sVersion = "1.54"
 
 	'-------------------------------------------------
 	' Create a new menu
@@ -160,6 +170,15 @@ Sub GetDefaultValues
 					' Name of column of Files list in the partner table
 					sFilesColumn = GetSingleNodeValue(hXMLNode, "FilesColumn")
 
+					' Name of column of Tags list in the partner table
+					sTagsColumn = GetSingleNodeValue(hXMLNode, "TagsColumn")
+
+					' The options for the selection types
+					sSelectTypeOptions = GetSingleNodeValue(hXMLNode, "SelectTypeOptions")
+
+					' Default selection type (1 = spatial, 2 = tags, 3 = both)
+					iDefaultSelectType = GetSingleNodeValue(hXMLNode, "DefaultSelectType")
+
 					' SQL used to list the names of SQL tables in the remote SQL database
 					sTableListSQL = GetSingleNodeValue(hXMLNode, "TableListSQL")
 
@@ -167,13 +186,13 @@ Sub GetDefaultValues
 					iRecMax = GetSingleNodeValue(hXMLNode, "RecMax")
 
 					' Default setting for zipping extract files
-					sZipDefault = GetSingleNodeValue(hXMLNode, "ZipDefault")
-
-					' Default setting for extracting confidential surveys
-					sConfidentialDefault = GetSingleNodeValue(hXMLNode, "ConfidentialDefault")
+					sDefaultZip = GetSingleNodeValue(hXMLNode, "DefaultZip")
 
 					' SQL clause for excluding confidential surveys
 					sConfidentialClause = GetSingleNodeValue(hXMLNode, "ConfidentialClause")
+
+					' Default setting for extracting confidential surveys
+					sDefaultConfidential = GetSingleNodeValue(hXMLNode, "DefaultConfidential")
 
 					'-------------------------------------------------
 					' Get a handle on the SQLTables node
@@ -279,7 +298,7 @@ Sub GetDefaultValues
 	' Build the SQL used to list the partner names
 	' from the partner table in the remote SQL database
 	'-------------------------------------------------
-	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sFilesColumn +
+	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sFilesColumn + 
 		" From " + sDefaultSchema + "." + sPartnerTable +
 		" Where " + sActiveColumn + " = 'Y' Or " + sActiveColumn + " = 'y'" + 
 		" Order By " + sPartnerColumn
@@ -329,10 +348,11 @@ Sub OpenDialog
 	' Build a new dialog window
 	'-------------------------------------------------
 	Dialog
-		Title "Data Extractor" Calling DialogSetup
+		Title "Data Extractor " + sVersion
 		Width 300
-		Height 220
+		Height 260
 		Position 50, 70
+		Calling DialogSetup
 
 	'-------------------------------------------------
 	' Add a partner listbox
@@ -343,7 +363,7 @@ Sub OpenDialog
 		ID 1
 		Title ""
 		Position 10, 20
-		Height 150
+		Height 170
 		Width 170
 		Calling PartnerList_Handler
 
@@ -356,19 +376,19 @@ Sub OpenDialog
 		ID 2
 		Title ""
 		Position 190, 20
-		Height 60
+		Height 30
 		Width 100
 
 	'-------------------------------------------------
 	' Add a MapInfo table listbox
 	'-------------------------------------------------
 	Control StaticText Title "MapInfo Tables:"
-		Position 190,100
+		Position 190,60
 	Control MultiListBox
 		ID 3
 		Title ""
-		Position 190, 110
-		Height 60
+		Position 190, 70
+		Height 120
 		Width 100
 
 	'-------------------------------------------------
@@ -377,7 +397,7 @@ Sub OpenDialog
 	Control CheckBox
 		ID 4
 		Title "Zip extract files?"
-		Position 10,180
+		Position 10,200
 		Value FALSE
 		Into bZipFiles
 
@@ -387,7 +407,7 @@ Sub OpenDialog
 	Control CheckBox
 		ID 5
 		Title "Extract confidential surveys?"
-		Position 105,180
+		Position 10,215
 		Value FALSE
 		Into bConfidentialSurveys
 
@@ -397,18 +417,31 @@ Sub OpenDialog
 	Control CheckBox
 		ID 6
 		Title "Clear log file?"
-		Position 235,180
+		Position 10,230
 		Value TRUE
 		Into bClearLog
+
+	'-------------------------------------------------
+	' Add a popup menu for picking the select type
+	'-------------------------------------------------
+	Control StaticText Title "Selection Type:"
+		Position 190,200
+	Control PopupMenu
+		ID 7
+		Value iDefaultSelectType
+		Title From Variable sSelectTypeOptions
+		Position 190,210
+		Width 100
+		Into iSelectType
 
 	'-------------------------------------------------
 	' Add Ok and cancel buttons
 	'-------------------------------------------------
 	Control CancelButton
-		Position 205,200
+		Position 205,240
 		Width 40
 	Control OKButton
-		Position 250,200
+		Position 250,240
 		Width 40
 		Calling CheckSelection
 
@@ -568,11 +601,6 @@ Sub DialogSetup
 		' Concatenate all the partners into an array
 		'-------------------------------------------------
 		i = i + 1
-		Redim aPartners(i)
-		Redim aShorts(i)
-		Redim aNotes(i)
-		Redim aFormats(i)
-		Redim aExports(i)
 		aPartners(i) = sPartner
 		aShorts(i) = LTrim$(RTrim$(sShort))
 		aNotes(i) = LTrim$(RTrim$(sNote))
@@ -582,6 +610,13 @@ Sub DialogSetup
 		Server nStmt Fetch Next
 
 	Wend
+
+	Redim aPartners(i)
+	Redim aShorts(i)
+	Redim aNotes(i)
+	Redim aFormats(i)
+	Redim aExports(i)
+	Redim aFiles(i)
 
 	'-------------------------------------------------
 	' Close the query results
@@ -611,18 +646,19 @@ Sub DialogSetup
 	' Loop through all the SQL tables matching the
 	' SQL criteria and add them to the SQL Tables list
 	'-------------------------------------------------
-	i = 1
+	i = 0
 	While Not Server_Eot(nStmt)
 
 		'-------------------------------------------------
 		' Concatenate all the SQL tables into an array
 		'-------------------------------------------------
-		Redim aSQLTables(i)
+		i = i + 1
 		aSQLTables(i) = aSQLTable
 		Server nStmt Fetch Next
-		i = i + 1
 
 	Wend
+
+	Redim aSQLTables(i)
 
 	'-------------------------------------------------
 	' Close the query results
@@ -656,9 +692,6 @@ Sub DialogSetup
 		'-------------------------------------------------
 		' Concatenate all the Map tables into an array
 		'-------------------------------------------------
-		Redim aMapNodes(i)
-		Redim aMapTables(i)
-		Redim aMapStmts(i)
 		If TableIsOpen(aFileMapTables(i)) Then
 			j = j + 1
 			aMapNodes(j) = aFileMapNodes(i)
@@ -670,6 +703,10 @@ Sub DialogSetup
 
 	Next
 
+	Redim aMapNodes(i)
+	Redim aMapTables(i)
+	Redim aMapStmts(i)
+
 	'-------------------------------------------------
 	' Update the Map Table list to show the list of tables
 	'-------------------------------------------------
@@ -679,7 +716,7 @@ SetDefaults:
 	'-------------------------------------------------
 	' Set the default value for the zip checkbox
 	'-------------------------------------------------
-	If UCase$(sZipDefault) = "YES" OR UCase$(sZipDefault) = "Y" Then
+	If UCase$(sDefaultZip) = "YES" OR UCase$(sDefaultZip) = "Y" Then
 		Alter Control 4 Value TRUE
 	Else
 		Alter Control 4 Value FALSE
@@ -689,11 +726,17 @@ SetDefaults:
 	' Set the default value for the extract
 	' confidential surveys checkbox
 	'-------------------------------------------------
-	If UCase$(sConfidentialDefault) = "YES" OR UCase$(sConfidentialDefault) = "Y" Then
+	If UCase$(sDefaultConfidential) = "YES" OR UCase$(sDefaultConfidential) = "Y" Then
 		Alter Control 5 Value TRUE
 	Else
 		Alter Control 5 Value FALSE
 	End If
+
+	'-------------------------------------------------
+	' Set the default value for the select type
+	' popup menu
+	'-------------------------------------------------
+	Alter Control 7 Value iDefaultSelectType
 
 Exit Sub
 
@@ -895,7 +938,10 @@ Sub ProcessExtracts
 		Else
 			Call MyPrint("Excluding confidential surveys ...")
 		End If
-		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, sTableName)
+
+		Call MyPrint("Performing selection type " + iSelectType + " ...")
+
+		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
 		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapStmt)
 	End If
@@ -945,6 +991,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 	sFormat As String,
 	sExport As String,
 	sFiles As String,
+	iSelectType As Integer,
 	sTableName As String)
 '*************************************************
 '* Routine to select the records from the
@@ -991,9 +1038,9 @@ Sub SelectSQL (ByVal nConn As Integer,
 	'-------------------------------------------------
 	Dim nStmt1 As Integer
 	Call MyPrint("Executing spatial selection ...")
-	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords '" + sDefaultSchema
+	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords2 '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
-	 + sPartnerName + "', '" + sShortName + "', '" + sTableName + "', '" + sUserID + "'")
+	 + sPartnerName + "', '" + sTagsColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUserID + "'")
 	Call MyPrint("Spatial selection complete.")
 
 	'-------------------------------------------------
@@ -1798,7 +1845,7 @@ Sub AboutBox
 '***************************************************************
 
 	Dialog
-		Title "About Data Extractor 1.53"
+		Title "About Data Extractor " + sVersion
 		Width 230
 		Height 115
 
