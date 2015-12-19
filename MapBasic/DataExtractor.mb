@@ -681,6 +681,12 @@ Sub DialogSetup
 	End If
 
 	'-------------------------------------------------
+	' Store the names of any tables not open
+	'-------------------------------------------------
+	Dim sClosedTables As String
+	sClosedTables = ""
+	
+	'-------------------------------------------------
 	' Loop through all the MapInfo tables listed in the
 	' config file and add them to the Map Tables list
 	' if they are open in MapInfo
@@ -698,7 +704,10 @@ Sub DialogSetup
 			aMapTables(j) = aFileMapTables(i)
 			aMapStmts(j) = aFileMapStmts(i)
 		Else
-			Note "Error: Table '" + aFileMapNodes(i) + "' is not already open as '" + aFileMapTables(i) + "'."
+			'-------------------------------------------------
+			' Store the name of the closed table
+			'-------------------------------------------------
+			sClosedTables = sClosedTables + Chr$(13) + aFileMapTables(i)
 		End If
 
 	Next
@@ -706,6 +715,13 @@ Sub DialogSetup
 	Redim aMapNodes(i)
 	Redim aMapTables(i)
 	Redim aMapStmts(i)
+
+	'-------------------------------------------------
+	' Warn the user of the closed tables
+	'-------------------------------------------------
+	If sClosedTables <> "" Then
+		Note "Warning: The following tables are not open ..." + Chr$(13)+ sClosedTables
+	End If
 
 	'-------------------------------------------------
 	' Update the Map Table list to show the list of tables
