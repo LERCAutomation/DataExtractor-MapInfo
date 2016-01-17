@@ -20,13 +20,9 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataSelector.def v1.52
 '*
 '* Defines global variables and declares subroutines and functions.
 '*
-'*
-'* Created:		Andy Foy - February 2013
-'* Last revised:	Andy Foy - June 2015
 '***************************************************************
 
 Include "MapBasic.def"

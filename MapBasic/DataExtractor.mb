@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.54
+'* DataExtractor v1.55
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,9 +29,18 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - December 2015
+'* Last revised:	Andy Foy - January 2016
 '* 
-'* *****************  Version 1.53  *****************
+'* *****************  Version 1.55  *****************
+'* Author: Andy Foy		Date: 17/01/2016
+'* A. Load active partner details from MapInfo .tab
+'*    file instead of SQL Server table.
+'* B. Count list of tables not already open in MapInfo.
+'* C. Perform user input checks before closing dialog.
+'* D. Fix incorrect call to TranslateToShapefile
+'*    function for Map tables.
+'* 
+'* *****************  Version 1.54  *****************
 '* Author: Andy Foy		Date: 08/12/2015
 '* A. Pass tags column to SQL stored procedure to also
 '*    select records based on their survey tags.
@@ -66,7 +75,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.54"
+	sVersion = "1.55"
 
 	'-------------------------------------------------
 	' Create a new menu
@@ -218,9 +227,6 @@ Sub GetDefaultValues
 					Do while hXMLFilesNode
 						
 						i = i + 1
-						Redim aFileSppNodes(i)
-						Redim aFileSppStmts(i)
-						Redim aFileSppClauses(i)
 
 						' Name of the table node
 						aFileSppNodes(i) = GetNodeName(hXMLFilesNode)
@@ -239,6 +245,10 @@ Sub GetDefaultValues
 						'-------------------------------------------------
 						hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
 					Loop
+
+					Redim aFileSppNodes(i)
+					Redim aFileSppStmts(i)
+					Redim aFileSppClauses(i)
 
 					'-------------------------------------------------
 					' Get a handle on the MapTables node
@@ -263,9 +273,6 @@ Sub GetDefaultValues
 					Do while hXMLFilesNode
 						
 						i = i + 1
-						Redim aFileMapNodes(i)
-						Redim aFileMapTables(i)
-						Redim aFileMapStmts(i)
 
 						' Name of the Map node
 						aFileMapNodes(i) = GetNodeName(hXMLFilesNode)
@@ -282,6 +289,10 @@ Sub GetDefaultValues
 						hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
 					Loop
 
+					Redim aFileMapNodes(i)
+					Redim aFileMapTables(i)
+					Redim aFileMapStmts(i)
+
 				End If
 
 			End If
@@ -296,12 +307,13 @@ Sub GetDefaultValues
 
 	'-------------------------------------------------
 	' Build the SQL used to list the partner names
-	' from the partner table in the remote SQL database
+	' from the partner MapInfo table
 	'-------------------------------------------------
 	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sFilesColumn + 
-		" From " + sDefaultSchema + "." + sPartnerTable +
-		" Where " + sActiveColumn + " = 'Y' Or " + sActiveColumn + " = 'y'" + 
-		" Order By " + sPartnerColumn
+		" From " + sPartnerTable +
+		" Where " + sActiveColumn + " = " + Chr$(34) + "Y" + Chr$(34) + " Or " + sActiveColumn + " = " + Chr$(34) + "y" + Chr$(34) + 
+		" Order By " + sPartnerColumn +
+		" Into PartnerList NoSelect"
 
 CleanUp:
 	'-------------------------------------------------
@@ -399,7 +411,7 @@ Sub OpenDialog
 		Title "Zip extract files?"
 		Position 10,200
 		Value FALSE
-		Into bZipFiles
+		'Into bZipFiles
 
 	'-------------------------------------------------
 	' Add a checkbox for extract confidential surveys
@@ -409,7 +421,7 @@ Sub OpenDialog
 		Title "Extract confidential surveys?"
 		Position 10,215
 		Value FALSE
-		Into bConfidentialSurveys
+		'Into bConfidentialSurveys
 
 	'-------------------------------------------------
 	' Add a checkbox for clearing the log file
@@ -419,7 +431,7 @@ Sub OpenDialog
 		Title "Clear log file?"
 		Position 10,230
 		Value TRUE
-		Into bClearLog
+		'Into bClearLog
 
 	'-------------------------------------------------
 	' Add a popup menu for picking the select type
@@ -432,7 +444,7 @@ Sub OpenDialog
 		Title From Variable sSelectTypeOptions
 		Position 190,210
 		Width 100
-		Into iSelectType
+		'Into iSelectType
 
 	'-------------------------------------------------
 	' Add Ok and cancel buttons
@@ -440,95 +452,11 @@ Sub OpenDialog
 	Control CancelButton
 		Position 205,240
 		Width 40
-	Control OKButton
+	Control Button
+		Title "Ok"
 		Position 250,240
 		Width 40
 		Calling CheckSelection
-
-	If CommandInfo(CMD_INFO_DLG_OK) And
-		iExtractTot > 0 Then
-
-		'-------------------------------------------------
-		' Clear the log file (if it exists)
-		'-------------------------------------------------
-		If bClearLog = True Then
-			If FileExists(sLogFileName) Then
-				Kill sLogFileName
-			End If
-		End If
-
-		'-------------------------------------------------
-		' Clear the translate to shapefile log file
-		' (if it exists)
-		'-------------------------------------------------
-		If bClearLog = True Then
-			Dim sLogFilePath As String, sLogFileShp As String
-			sLogFilePath = PathToDirectory$(sLogFileName)
-			sLogFileShp = "TabToShp" + "_" + sUserID
-
-			If FileExists(sLogFilePath + "\" + sLogFileShp + "_MUT.log") Then
-				Kill sLogFilePath + "\" + sLogFileShp + "_MUT.log"
-			End If
-		End If
-
-		'-------------------------------------------------
-		' Reset the global variables
-		'-------------------------------------------------
-		sLastShortName = ""
-
-		Call MyPrint("----------------------------------------------------------------------")
-		Call MyPrint("Process started!")
-		Call MyPrint("----------------------------------------------------------------------")
-		Call MyPrint("")
-
-		'-------------------------------------------------
-		' Process the selections one by one
-		'-------------------------------------------------
-		iExtractCnt = 1
-		ProgressBar "Processing " + iExtractTot + " data extracts ..."
-			Calling ProcessExtracts
-			Range iExtractTot
-
-		Dim lResponse As Logical
-		If CommandInfo(CMD_INFO_STATUS) Then
-			Call MyPrint("----------------------------------------------------------------------")
-			Call MyPrint("Process completed!")
-			Call MyPrint("----------------------------------------------------------------------")
-			lResponse = Ask("Processing complete!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
-		Else
-			Call MyPrint("----------------------------------------------------------------------")
-			Call MyPrint("Process interrupted by user!")
-			Call MyPrint("----------------------------------------------------------------------")
-			lResponse = Ask("Processing interrupted!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
-		End If
-
-		'-------------------------------------------------
-		' Ask the user if they want to see the log file
-		'-------------------------------------------------
-		If lResponse = True Then
-			'-------------------------------------------------
-			' Open the Message window and clear it
-			'-------------------------------------------------
-			Close Window Message
-			Open Window Message
-			Set Window Message
-				Position (7,4)
-				Width 6
-				Height 5
-			Print(chr$(12))
-
-			'-------------------------------------------------
-			' Display the log file in the message window
-			'-------------------------------------------------
-			Call PrintLogFile
-
-		End If
-
-		'-------------------------------------------------
-		' Disconnect the connection to the SQL Server database
-		'-------------------------------------------------
-		Server nConn Disconnect
-	End If
 
 Done:
 	Exit Sub
@@ -571,67 +499,84 @@ Sub DialogSetup
 	OnError Goto 0
 
 	'-------------------------------------------------
+	' Check the partner table is already open in
+	' MapInfo
+	'-------------------------------------------------
+	If Not TableIsOpen(sPartnerTable) Then
+		Note "Error: Table '" + sPartnerTable + "' is not open."
+		Goto SetDefaults
+	End If
+
+	'-------------------------------------------------
 	' Query all the Partners in the boundary table
 	'-------------------------------------------------
-	Dim nStmt as Integer
-	nStmt = Server_Execute(nConn, sPartnerListSQL)
+	Run Command (sPartnerListSQL)
 
 	'-------------------------------------------------
-	' Bind to the columns of the results
+	' Count the number of rows selected
 	'-------------------------------------------------
-	Dim sPartner, sShort, sNote, sFormat, sExport, sFiles As String
-	Dim iPartner, iShort, iNote, iFormat, iExport, iFiles As Integer
-	Server nStmt Bind Column 1 To sPartner, iPartner
-	Server nStmt Bind Column 2 To sShort, iShort
-	Server nStmt Bind Column 3 To sNote, iNote
-	Server nStmt Bind Column 4 To sFormat, iFormat
-	Server nStmt Bind Column 5 To sExport, iExport
-	Server nStmt Bind Column 6 To sFiles, iFiles
-	Server nStmt Fetch Next
+	Dim iPartners As Integer
+	iPartners = TableInfo("PartnerList", TAB_INFO_NROWS)
 
 	'-------------------------------------------------
-	' Loop through all the partners in the partners
-	' table and add them to the Partners list
+	' If any rows were selected then load the columns
 	'-------------------------------------------------
-	Dim i as integer
-	i = 0
-	While Not Server_Eot(nStmt)
+	If iPartners > 0 Then
 
 		'-------------------------------------------------
-		' Concatenate all the partners into an array
+		' Fetch the first of the selected rows
 		'-------------------------------------------------
-		i = i + 1
-		aPartners(i) = sPartner
-		aShorts(i) = LTrim$(RTrim$(sShort))
-		aNotes(i) = LTrim$(RTrim$(sNote))
-		aFormats(i) = sFormat
-		aExports(i) = sExport
-		aFiles(i) = sFiles
-		Server nStmt Fetch Next
+		Fetch First from PartnerList
 
-	Wend
+		Dim sPartner, sShort, sNote, sFormat, sExport, sFiles As String
 
-	Redim aPartners(i)
-	Redim aShorts(i)
-	Redim aNotes(i)
-	Redim aFormats(i)
-	Redim aExports(i)
-	Redim aFiles(i)
+		'-------------------------------------------------
+		' Loop through all the partners in the partners
+		' table and add them to the Partners list
+		'-------------------------------------------------
+		Dim i as integer
+		i = 0
+		While i < iPartners
+	
+			i = i + 1
 
-	'-------------------------------------------------
-	' Close the query results
-	'-------------------------------------------------
-	Server nStmt Close
+			'-------------------------------------------------
+			' Concatenate all the partners into an array
+			'-------------------------------------------------
+			aPartners(i) = PartnerList.Col1
+			aShorts(i) = LTrim$(RTrim$(PartnerList.Col2))
+			aNotes(i) = LTrim$(RTrim$(PartnerList.Col3))
+			aFormats(i) = PartnerList.Col4
+			aExports(i) = PartnerList.Col5
+			aFiles(i) = PartnerList.Col6
+
+			Fetch Next from PartnerList
+	
+		Wend
+
+		Redim aPartners(i)
+		Redim aShorts(i)
+		Redim aNotes(i)
+		Redim aFormats(i)
+		Redim aExports(i)
+		Redim aFiles(i)
+		
+		'-------------------------------------------------
+		' Close the list of Partners
+		'-------------------------------------------------
+		Close Table PartnerList
+
+	End If
 
 	'-------------------------------------------------
 	' Update the Partner list to show the list of partners
 	'-------------------------------------------------
-	ReDim aPartners(i)
 	Alter Control 1 Title FROM Variable aPartners
 
 	'-------------------------------------------------
 	' Query all the tables in the database
 	'-------------------------------------------------
+	Dim nStmt as Integer
 	nStmt = Server_Execute(nConn, sTableListSQL)
 
 	'-------------------------------------------------
@@ -672,19 +617,11 @@ Sub DialogSetup
 	Alter Control 2 Title FROM Variable aSQLTables
 
 	'-------------------------------------------------
-	' Check the partner table is already open in
-	' MapInfo
-	'-------------------------------------------------
-	If Not TableIsOpen(sPartnerTable) Then
-		Note "Error: Table '" + sPartnerTable + "' is not open. Unable to process MapInfo tables."
-		Goto SetDefaults
-	End If
-
-	'-------------------------------------------------
 	' Store the names of any tables not open
 	'-------------------------------------------------
-	Dim sClosedTables As String
+	Dim sClosedTables As String, iClosedCount as Integer
 	sClosedTables = ""
+	iClosedCount = 0
 	
 	'-------------------------------------------------
 	' Loop through all the MapInfo tables listed in the
@@ -708,19 +645,24 @@ Sub DialogSetup
 			' Store the name of the closed table
 			'-------------------------------------------------
 			sClosedTables = sClosedTables + Chr$(13) + aFileMapTables(i)
+			iClosedCount = iClosedCount + 1
 		End If
 
 	Next
 
-	Redim aMapNodes(i)
-	Redim aMapTables(i)
-	Redim aMapStmts(i)
+	Redim aMapNodes(j)
+	Redim aMapTables(j)
+	Redim aMapStmts(j)
 
 	'-------------------------------------------------
 	' Warn the user of the closed tables
 	'-------------------------------------------------
-	If sClosedTables <> "" Then
-		Note "Warning: The following tables are not open ..." + Chr$(13)+ sClosedTables
+	If iClosedCount > 0 Then
+		If iClosedCount = 1 Then
+			Note "Warning: the following table is not open ..." + Chr$(13) + sClosedTables
+		Else
+			Note "Warning: " + iClosedCount + " tables are not open, including ..." + Chr$(13)+ sClosedTables
+		End If
 	End If
 
 	'-------------------------------------------------
@@ -791,7 +733,13 @@ Sub CheckSelection
 '* Check the user's selections and process according
 '***************************************************************
 
-	iExtractTot = 0
+	'-------------------------------------------------
+	' Store the dialog variables
+	'-------------------------------------------------
+	bZipFiles = ReadControlValue(4)
+	bConfidentialSurveys = ReadControlValue(5)
+	bClearLog = ReadControlValue(6)
+	iSelectType = ReadControlValue(7)
 
 	'-------------------------------------------------
 	' Check if the user has selected at least one partner
@@ -814,9 +762,15 @@ Sub CheckSelection
 	End If
 
 	'-------------------------------------------------
+	' Reset the global variables
+	'-------------------------------------------------
+	iExtractTot = 0
+	iExtractCnt = 0
+	sLastShortName = ""
+
+	'-------------------------------------------------
 	' Count the number of extracts to run
 	'-------------------------------------------------
-	iExtractCnt = 0
 	Do While iPartner > 0
 		Do While iSQLTable > 0
 			'-------------------------------------------------
@@ -879,6 +833,85 @@ Sub CheckSelection
 		iMapTable = ReadControlValue(3)
 	Loop
 
+	'-------------------------------------------------
+	' Close the dialog
+	'-------------------------------------------------
+	Dialog Remove
+
+	'-------------------------------------------------
+	' Clear the log file (if it exists)
+	'-------------------------------------------------
+	If bClearLog = True Then
+		If FileExists(sLogFileName) Then
+			Kill sLogFileName
+		End If
+
+		'-------------------------------------------------
+		' Clear the translate to shapefile log file
+		' (if it exists)
+		'-------------------------------------------------
+		Dim sLogFilePath As String, sLogFileShp As String
+		sLogFilePath = PathToDirectory$(sLogFileName)
+		sLogFileShp = "TabToShp" + "_" + sUserID
+
+		If FileExists(sLogFilePath + "\" + sLogFileShp + "_MUT.log") Then
+			Kill sLogFilePath + "\" + sLogFileShp + "_MUT.log"
+		End If
+	End If
+
+	Call MyPrint("----------------------------------------------------------------------")
+	Call MyPrint("Process started!")
+	Call MyPrint("----------------------------------------------------------------------")
+	Call MyPrint("")
+
+	'-------------------------------------------------
+	' Process the selections one by one
+	'-------------------------------------------------
+	iExtractCnt = 1
+	ProgressBar "Processing " + iExtractTot + " data extracts ..."
+		Calling ProcessExtracts
+		Range iExtractTot
+
+	Dim lResponse As Logical
+	If CommandInfo(CMD_INFO_STATUS) Then
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("Process completed!")
+		Call MyPrint("----------------------------------------------------------------------")
+		lResponse = Ask("Processing complete!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
+	Else
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("Process interrupted by user!")
+		Call MyPrint("----------------------------------------------------------------------")
+		lResponse = Ask("Processing interrupted!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
+	End If
+
+	'-------------------------------------------------
+	' Ask the user if they want to see the log file
+	'-------------------------------------------------
+	If lResponse = True Then
+		'-------------------------------------------------
+		' Open the Message window and clear it
+		'-------------------------------------------------
+		Close Window Message
+		Open Window Message
+		Set Window Message
+			Position (7,4)
+			Width 5
+			Height 5
+		Print(chr$(12))
+
+		'-------------------------------------------------
+		' Display the log file in the message window
+		'-------------------------------------------------
+		Call PrintLogFile
+
+	End If
+
+	'-------------------------------------------------
+	' Disconnect the connection to the SQL Server database
+	'-------------------------------------------------
+	Server nConn Disconnect
+
 End Sub
 
 Sub ProcessExtracts
@@ -897,6 +930,9 @@ Sub ProcessExtracts
 	sFiles = aFilesSelected(iExtractCnt)
 	sMapStmt = aMapStmtSelected(iExtractCnt)
 
+	'-------------------------------------------------
+	' If this is a new partner ...
+	'-------------------------------------------------
 	If sShortName <> sLastShortName and iExtractCnt <> 1 Then
 
 		'-------------------------------------------------
@@ -1514,7 +1550,7 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 				' Get a handle on the DataExtractor node
 				'-------------------------------------------------
 				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
-	          If hXMLNode Then
+	          	If hXMLNode Then
 	
 					'-------------------------------------------------
 					' Get a handle on the SQLTables node
@@ -1821,7 +1857,11 @@ Sub SelectMaps (sPartnerName As String,
 	' Translate the table to ESRI shapefile if required
 	'-------------------------------------------------
 	If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
-		Call TranslateToShapefile(sDefaultPath, sLocalName, sShortName, sTempName)
+		Dim sLogFilePath As String, sLogFileShp As String
+		sLogFilePath = PathToDirectory$(sLogFileName)
+		sLogFileShp = "TabToShp" + "_" + sUserID
+
+		Call TranslateToShapefile(sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
 	End If
 
 	'-------------------------------------------------
