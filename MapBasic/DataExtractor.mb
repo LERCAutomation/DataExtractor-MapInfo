@@ -2,7 +2,7 @@
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
 '* Copyright © 2013, 2015 GiGL
-'* Copyright © 2015 TVERC & GiGL
+'* Copyright © 2015 - 2016 TVERC & GiGL
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -1906,13 +1906,13 @@ Sub AboutBox
 		Height 115
 
 	Control StaticText
-		Title "This program will extract GiGL SQL records and/or GIS"
+		Title "This program will extract SQL records and/or GIS"
 		Position 10,10
 	Control StaticText
 		Title "layers that intersect with partner boundary feature(s)."
 		Position 10,20
 	Control StaticText
-		Title "The user can select which GiGL SQL tables or GIS layers"
+		Title "The user can select which SQL table or GIS layers"
 		Position 10,30
 	Control StaticText
 		Title "to extract and which partner boundaries to extract for."
@@ -1921,7 +1921,7 @@ Sub AboutBox
 		Title "Created by Andy Foy Consulting."
 		Position 10,60
 	Control StaticText
-		Title "Copyright© 2012-2013, 2015 GiGL."
+		Title "Copyright© 2012-2013 GiGL, 2015 - 2016 TVERC & GiGL."
 		Position 10,70
 	Control OKButton
 		Position 185,95
