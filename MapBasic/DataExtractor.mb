@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.55
+'* DataExtractor v1.56
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,14 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - January 2016
+'* Last revised:	Andy Foy - February 2016
+'* 
+'* *****************  Version 1.56  *****************
+'* Author: Andy Foy		Date: 22/02/2016
+'* A. Enable export of tables in either CSV or TXT
+'*    format.
+'* B. Hide dialog checkbox options if default values
+'*    are blank.
 '* 
 '* *****************  Version 1.55  *****************
 '* Author: Andy Foy		Date: 17/01/2016
@@ -75,7 +82,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.55"
+	sVersion = "1.56"
 
 	'-------------------------------------------------
 	' Create a new menu
@@ -173,7 +180,7 @@ Sub GetDefaultValues
 					' Name of column of GIS format in the partner table
 					sFormatColumn = GetSingleNodeValue(hXMLNode, "FormatColumn")
 
-					' Name of column of Export to CSV flag in the partner table
+					' Name of column of Export to text format in the partner table
 					sExportColumn = GetSingleNodeValue(hXMLNode, "ExportColumn")
 
 					' Name of column of Files list in the partner table
@@ -681,6 +688,13 @@ SetDefaults:
 	End If
 
 	'-------------------------------------------------
+	' Hide the zip checkbox if no default set
+	'-------------------------------------------------
+	If sDefaultZip = "" Then
+		Alter Control 4 Hide
+	End If
+
+	'-------------------------------------------------
 	' Set the default value for the extract
 	' confidential surveys checkbox
 	'-------------------------------------------------
@@ -688,6 +702,14 @@ SetDefaults:
 		Alter Control 5 Value TRUE
 	Else
 		Alter Control 5 Value FALSE
+	End If
+
+	'-------------------------------------------------
+	' Hide the confidential surveys checkbox if no
+	' default set
+	'-------------------------------------------------
+	If sDefaultConfidential = "" Then
+		Alter Control 5 Hide
 	End If
 
 	'-------------------------------------------------
@@ -1065,8 +1087,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 	'-------------------------------------------------
 	' Check the partner requires something
 	'-------------------------------------------------
-	If UCase$(sExport) <> "YES" And
-		UCase$(sExport) <> "Y" And
+	If UCase$(sExport) = "" AND
 		((UCase$(sFormat) <> "SHP" And
 		UCase$(sFormat) <> "TAB" And
 		UCase$(sFormat) <> "BOTH") Or
@@ -1373,16 +1394,32 @@ Sub SelectSQL (ByVal nConn As Integer,
 		End If
 
 		'-------------------------------------------------
-		' Also export the table as a CSV if required
+		' Also export the table as a text file if required
 		'-------------------------------------------------
-		If UCase$(sExport) = "YES" Or UCase$(sExport) = "Y" Then
+		If UCase$(sExport) = "CSV" Then
 			Call MyPrint("Exporting as a CSV ...")
 
 			Set ProgressBars Off
 
 			Export sLocalName + "_" + sShortName
 				Into sLocalPath + "\" + sLocalName + ".csv"
-				Type "CSV"
+				Type "ASCII"
+				Delimiter ","
+				CharSet "WindowsLatin1"
+				Titles
+				Overwrite
+
+			Set ProgressBars On
+
+		ElseIf UCase$(sExport) = "TXT" Then
+			Call MyPrint("Exporting as a TXT ...")
+
+			Set ProgressBars Off
+
+			Export sLocalName + "_" + sShortName
+				Into sLocalPath + "\" + sLocalName + ".txt"
+				Type "ASCII"
+				CharSet "WindowsLatin1"
 				Titles
 				Overwrite
 
@@ -1745,8 +1782,7 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	' Check the partner requires something
 	'-------------------------------------------------
-	If UCase$(sExport) <> "YES" And
-		UCase$(sExport) <> "Y" And
+	If UCase$(sExport) = "" And
 		((UCase$(sFormat) <> "SHP" And
 		UCase$(sFormat) <> "TAB" And
 		UCase$(sFormat) <> "BOTH") Or
@@ -1836,22 +1872,38 @@ Sub SelectMaps (sPartnerName As String,
 	Run Command (sCmd)
 
 	'-------------------------------------------------
-	' Also export the table as a CSV if required
+	' Also export the table as a text file if required
 	'-------------------------------------------------
-	If UCase$(sExport) = "YES" Or UCase$(sExport) = "Y" Then
-		Call MyPrint("Exporting as a CSV ...")
+		If UCase$(sExport) = "CSV" Then
+			Call MyPrint("Exporting as a CSV ...")
 
-		Set ProgressBars Off
+			Set ProgressBars Off
 
-		Export sLocalName + "_" + sShortName
-			Into sLocalPath + "\" + sLocalName + ".csv"
-			Type "CSV"
-			Titles
-			Overwrite
+			Export sLocalName + "_" + sShortName
+				Into sLocalPath + "\" + sLocalName + ".csv"
+				Type "ASCII"
+				Delimiter ","
+				CharSet "WindowsLatin1"
+				Titles
+				Overwrite
 
-		Set ProgressBars On
+			Set ProgressBars On
 
-	End If
+		ElseIf UCase$(sExport) = "TXT" Then
+			Call MyPrint("Exporting as a TXT ...")
+
+			Set ProgressBars Off
+
+			Export sLocalName + "_" + sShortName
+				Into sLocalPath + "\" + sLocalName + ".txt"
+				Type "ASCII"
+				CharSet "WindowsLatin1"
+				Titles
+				Overwrite
+
+			Set ProgressBars On
+
+		End If
 
 	'-------------------------------------------------
 	' Translate the table to ESRI shapefile if required
