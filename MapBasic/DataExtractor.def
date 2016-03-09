@@ -73,6 +73,8 @@ Define MIXmlNamedNodeMap Integer
 Define MIXMLSchemaCollection Integer
 Define MIXML_LIB_NAME "GmlXlat.dll"
 Define MIWEBSERVICES_LIB_NAME "GmlXlat.dll"
+'Define MIXML_LIB_NAME "MapInfo.XmlUtil.dll"
+'Define MIWEBSERVICES_LIB_NAME "MapInfo.XmlUtil.dll"
 
 '-------------------------------------------------
 ' Declare the subroutines

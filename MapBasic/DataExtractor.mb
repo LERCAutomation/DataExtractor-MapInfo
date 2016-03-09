@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.56
+'* DataExtractor v1.57
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,12 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - February 2016
+'* Last revised:	Andy Foy - March 2016
+'*
+'* *****************  Version 1.57  *****************
+'* Author: Andy Foy		Date: 09/03/2016
+'* A. Ask user if they want to keep the dialog open.
+'* B. Open log file using Notepad.exe.
 '* 
 '* *****************  Version 1.56  *****************
 '* Author: Andy Foy		Date: 22/02/2016
@@ -82,7 +87,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.56"
+	sVersion = "1.57"
 
 	'-------------------------------------------------
 	' Create a new menu
@@ -142,7 +147,7 @@ Sub GetDefaultValues
 				' Get a handle on the DataExtractor node
 				'-------------------------------------------------
 				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
-	          If hXMLNode Then
+	          	If hXMLNode Then
 	
 					'-------------------------------------------------
 					' Load the default values from the child nodes
@@ -856,11 +861,6 @@ Sub CheckSelection
 	Loop
 
 	'-------------------------------------------------
-	' Close the dialog
-	'-------------------------------------------------
-	Dialog Remove
-
-	'-------------------------------------------------
 	' Clear the log file (if it exists)
 	'-------------------------------------------------
 	If bClearLog = True Then
@@ -894,40 +894,34 @@ Sub CheckSelection
 		Calling ProcessExtracts
 		Range iExtractTot
 
+	'-------------------------------------------------
+	' Ask the user if they want to close the form
+	'-------------------------------------------------
 	Dim lResponse As Logical
 	If CommandInfo(CMD_INFO_STATUS) Then
 		Call MyPrint("----------------------------------------------------------------------")
 		Call MyPrint("Process completed!")
 		Call MyPrint("----------------------------------------------------------------------")
-		lResponse = Ask("Processing complete!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
+		lResponse = Ask("Processing complete!" + Chr$(10) + Chr$(10) + Chr$(10) + "Do you wish to close the form?", "Yes", "No")
 	Else
 		Call MyPrint("----------------------------------------------------------------------")
 		Call MyPrint("Process interrupted by user!")
 		Call MyPrint("----------------------------------------------------------------------")
-		lResponse = Ask("Processing interrupted!" + Chr$(10) + Chr$(10) + Chr$(10) + "Show log file?", "Yes", "No")
+		lResponse = Ask("Processing interrupted!" + Chr$(10) + Chr$(10) + Chr$(10) + "Do you wish to close the form?", "Yes", "No")
 	End If
 
-	'-------------------------------------------------
-	' Ask the user if they want to see the log file
-	'-------------------------------------------------
 	If lResponse = True Then
 		'-------------------------------------------------
-		' Open the Message window and clear it
+		' Close the dialog
 		'-------------------------------------------------
-		Close Window Message
-		Open Window Message
-		Set Window Message
-			Position (7,4)
-			Width 5
-			Height 5
-		Print(chr$(12))
-
-		'-------------------------------------------------
-		' Display the log file in the message window
-		'-------------------------------------------------
-		Call PrintLogFile
+		Dialog Remove
 
 	End If
+
+	'-------------------------------------------------
+	' Display the log file in the message window
+	'-------------------------------------------------
+	Call PrintLogFile
 
 	'-------------------------------------------------
 	' Disconnect the connection to the SQL Server database
@@ -2005,45 +1999,15 @@ End Sub
 
 Sub PrintLogFile()
 '***************************************************************
-'* Print the log file to the message window
+'* Open the log file in Notepad
 '***************************************************************
 
 	'-------------------------------------------------
-	' Open the log file for input
+	' Open the log file in Notepad
 	'-------------------------------------------------
-	Open File sLogFileName For Input As #99
-
-	'-------------------------------------------------
-	' Get the first line
-	'-------------------------------------------------
-	Dim sMsg As String
-	Line Input #99, sMsg
-
-	'-------------------------------------------------
-	' Loop through all the lines until the log file
-	' is empty
-	'-------------------------------------------------
-	Do Until EOF(99)
-		'-------------------------------------------------
-		' Print the log file line to the message window
-		'-------------------------------------------------
-		Print sMsg
-
-		'-------------------------------------------------
-		' Get the first line
-		'-------------------------------------------------
-		Line Input #99, sMsg
-	Loop
-
-	'-------------------------------------------------
-	' Refresh the message window
-	'-------------------------------------------------
-	Update Window WIN_MESSAGE
-
-	'-------------------------------------------------
-	' Close the log file
-	'-------------------------------------------------
-	Close File #99
+	Dim sCmd As String
+	sCmd = "Run Program " +  + Chr$(34) + "NotePad.exe " + sLogFileName + Chr$(34)
+	Run Command (sCmd)
 
 End Sub
 
