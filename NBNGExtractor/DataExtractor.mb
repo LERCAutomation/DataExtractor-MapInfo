@@ -1,26 +1,26 @@
-'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* NBNGExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
 '* Copyright © 2013, 2015 GiGL
 '* Copyright © 2015 - 2016 TVERC & GiGL
 '* 
-'* This file is part of the MapInfo tool 'DataExtractor'.
+'* This file is part of the MapInfo tool 'NBNGExtractor'.
 '* 
-'* DataExtractor is free software: you can redistribute it and/or modify
+'* NBNGExtractor is free software: you can redistribute it and/or modify
 '* it under the terms of the GNU General Public License as published by
 '* the Free Software Foundation, either version 3 of the License, or
 '* (at your option) any later version.
 '* 
-'* DataExtractor is distributed in the hope that it will be useful,
+'* NBNGExtractor is distributed in the hope that it will be useful,
 '* but WITHOUT ANY WARRANTY; without even the implied warranty of
 '* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 '* GNU General Public License for more details.
 '* 
 '* You should have received a copy of the GNU General Public License
-'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'* along with NBNGExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.57
+'* NBNGExtractor v1.57
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -92,17 +92,17 @@ Sub Main
 	'-------------------------------------------------
 	' Create a new menu
 	'-------------------------------------------------
-	Create Menu "&Data Extractor" As
-	   "&Run Data Extractor ..." Calling OpenDialog,
+	Create Menu "&NBNGateway Extractor" As
+	   "&Run NBNGateway Extractor ..." Calling OpenDialog,
 	   "(-",
-	   "&About Data Extractor ..." Calling AboutBox,
-	   "E&xit Data Extractor" Calling egsit
+	   "&About NBNGateway Extractor ..." Calling AboutBox,
+	   "E&xit NBNGateway Extractor" Calling egsit
 
 	'-------------------------------------------------
 	' Add the new menu item to the Tools menu
 	'-------------------------------------------------
 	Alter Menu "Tools" Add
-		"Data Extractor" As "Data Extractor"
+		"NBNGateway Extractor" As "NBNGateway Extractor"
 
 	Exit Sub
 
@@ -134,7 +134,7 @@ Sub GetDefaultValues
 		' Load the document into the document handle
 		'-------------------------------------------------
 		Dim iXMLLoad As SmallInt
-		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "NBNGExtractor.xml", bParseError, FALSE, FALSE)
 		if iXMLLoad > 0 Then
 
 			'-------------------------------------------------
@@ -144,19 +144,19 @@ Sub GetDefaultValues
 			If hXMLRoot Then
 
 				'-------------------------------------------------
-				' Get a handle on the DataExtractor node
+				' Get a handle on the NBNGExtractor node
 				'-------------------------------------------------
-				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
-	          	If hXMLNode Then
+				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "NBNGExtractor")
+	          If hXMLNode Then
 	
 					'-------------------------------------------------
 					' Load the default values from the child nodes
-					' under the DataExtractor node
+					' under the NBNGExtractor node
 					'-------------------------------------------------
 					' File path for for storing the log file
 					Dim sLogFilePath As string
 					sLogFilePath = GetSingleNodeValue(hXMLNode, "LogFilePath")
-					sLogFileName = sLogFilePath & "\DataExtractor_" & sUserID & ".log"
+					sLogFileName = sLogFilePath & "\NBNGExtractor_" & sUserID & ".log"
 
 					' File DSN path and name containing remote SQL database connection settings
 					sFileDSN = GetSingleNodeValue(hXMLNode, "FileDSN")
@@ -454,6 +454,7 @@ Sub OpenDialog
 		ID 7
 		Value iDefaultSelectType
 		Title From Variable sSelectTypeOptions
+
 		Position 190,210
 		Width 100
 		'Into iSelectType
@@ -1569,7 +1570,7 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 		' Load the document into the document handle
 		'-------------------------------------------------
 		Dim iXMLLoad As SmallInt
-		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "NBNGExtractor.xml", bParseError, FALSE, FALSE)
 		if iXMLLoad > 0 Then
 
 			'-------------------------------------------------
@@ -1579,9 +1580,9 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 			If hXMLRoot Then
 
 				'-------------------------------------------------
-				' Get a handle on the DataExtractor node
+				' Get a handle on the NBNGExtractor node
 				'-------------------------------------------------
-				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
+				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "NBNGExtractor")
 	          	If hXMLNode Then
 	
 					'-------------------------------------------------
@@ -1949,7 +1950,7 @@ Sub AboutBox
 '***************************************************************
 
 	Dialog
-		Title "About Data Extractor " + sVersion
+		Title "About NBNGateway Extractor " + sVersion
 		Width 230
 		Height 115
 
