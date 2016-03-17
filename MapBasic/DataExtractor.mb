@@ -916,17 +916,17 @@ Sub CheckSelection
 		'-------------------------------------------------
 		Dialog Remove
 
+		'-------------------------------------------------
+		' Disconnect the connection to the SQL Server database
+		'-------------------------------------------------
+		Server nConn Disconnect
+
 	End If
 
 	'-------------------------------------------------
 	' Display the log file in the message window
 	'-------------------------------------------------
 	Call PrintLogFile
-
-	'-------------------------------------------------
-	' Disconnect the connection to the SQL Server database
-	'-------------------------------------------------
-	Server nConn Disconnect
 
 End Sub
 
