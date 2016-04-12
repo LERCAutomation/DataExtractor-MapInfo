@@ -1,0 +1,6 @@
+[Link]
+Application=NBNGExtractor.mbx
+Module=NBNGExtractor.mbo
+Module=GenFunctions.mbo
+Module=TranslateToSHP.mbo
+Module=XMLFunctions.mbo

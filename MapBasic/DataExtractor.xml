@@ -17,7 +17,7 @@ The 'DataExtractor' node contains all of the entries relating to the
 MapBasic tool variables.
 
 Each entry relates to a file, folder, table name, column name or SQL statement
-used by the MapBasic tool to select and export data for the GiGL partners.
+used by the MapBasic tool to select and export data for partners.
 -->
 
 <configuration>
@@ -86,9 +86,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
   </FormatColumn>
 
   <!-- The name of the column in the partner GIS layer indicating whether an export should also
-       be created as a CSV file -->
+       be created as a CSV or TXT file -->
   <ExportColumn>
-	<value>CSVfile</value>
+	<value>Exportformat</value>
   </ExportColumn>
 
   <!-- The name of the column in the partner GIS layer indicating which files should be
@@ -113,17 +113,18 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 	<value>3</value>
   </DefaultSelectType>
 
-  <!-- The maximum number of records what will be extracted in any one partner extract -->
+  <!-- The maximum number of records what will be extracted in any one partner extract.
+  Tables that would contain more than the maximum number of records will not be created -->
   <RecMax>
 	<value>10000000</value>
   </RecMax>
 
   <!-- The default value for zipping the extract files -->
   <DefaultZip>
-	<value>Yes</value>
+	<value>No</value>
   </DefaultZip>
 
-  <!-- The SQL criteria for excluding any confidential surveys -->
+  <!-- The SQL criteria for excluding any confidential species records -->
   <ConfidentialClause>
 	<value> AND R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
   </ConfidentialClause>
@@ -154,12 +155,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
-					<Value>2,64,255,14,MapInfo Dispersed Group,0,0</Value>
-				</Style>
+				<Symbol>
+					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -168,12 +166,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
-					<Value>2,65,255,12,MapInfo Dispersed Group,0,0</Value>
-				</Style>
+				<Symbol>
+					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_AllSpp>
@@ -195,12 +190,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
-					<Value>2,64,16711680,14,"MapInfo Dispersed Groups",0,0</Value>
-				</Style>
+				<Symbol>
+					<Value>2,64,16711680,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -209,12 +201,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,16711680,12,"MapInfo Dispersed Groups",0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</DesignatedSpp>
@@ -236,12 +225,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,64,0,14,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -250,12 +236,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,0,12,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_LISISpp>
@@ -277,12 +260,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -291,12 +271,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_Birds>
@@ -318,12 +295,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,64,16732328,14,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -332,12 +306,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,16732328,12,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_SppAbsence>
@@ -359,26 +330,12 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Region</Value>
 				</Object>
-				<Type>
-					<Value>Pen</Value>
-				</Type>
-				<Style>
+				<Pen>
 					<Value>2,2,10526880</Value>
-				</Style>
-			</Symbol>
-			<Symbol>
-				<Clause>
-					<Value>GRPRECISION = 1000</Value>
-				</Clause>
-				<Object>
-					<Value>Region</Value>
-				</Object>
-				<Type>
-					<Value>Brush</Value>
-				</Type>
-				<Style>
+				</Pen>
+				<Brush>
 					<Value>5,10526880</Value>
-				</Style>
+				</Brush>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -387,26 +344,12 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Region</Value>
 				</Object>
-				<Type>
-					<Value>Pen</Value>
-				</Type>
-				<Style>
+				<Pen>
 					<Value>2,2,10526880</Value>
-				</Style>
-			</Symbol>
-			<Symbol>
-				<Clause>
-					<Value>GRPRECISION = 2000</Value>
-				</Clause>
-				<Object>
-					<Value>Region</Value>
-				</Object>
-				<Type>
-					<Value>Brush</Value>
-				</Type>
-				<Style>
+				</Pen>
+				<Brush>
 					<Value>6,10526880</Value>
-				</Style>
+				</Brush>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -415,26 +358,12 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Region</Value>
 				</Object>
-				<Type>
-					<Value>Pen</Value>
-				</Type>
-				<Style>
+				<Pen>
 					<Value>2,2,10526880</Value>
-				</Style>
-			</Symbol>
-			<Symbol>
-				<Clause>
-					<Value>GRPRECISION = 10000</Value>
-				</Clause>
-				<Object>
-					<Value>Region</Value>
-				</Object>
-				<Type>
-					<Value>Brush</Value>
-				</Type>
-				<Style>
+				</Pen>
+				<Brush>
 					<Value>1,10526880</Value>
-				</Style>
+				</Brush>
 			</Symbol>
 		</Symbology>
 	</GiGL_CoarseResolutionSpp>
@@ -456,12 +385,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -470,12 +396,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_Plants>
@@ -497,12 +420,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -511,12 +431,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_OtherSpp>
@@ -538,12 +455,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,64,8421376,14,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 			<Symbol>
 				<Clause>
@@ -552,12 +466,9 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 				<Object>
 					<Value>Point</Value>
 				</Object>
-				<Type>
-					<Value>Symbol</Value>
-				</Type>
-				<Style>
+				<Symbol>
 					<Value>2,65,8421376,12,MapInfo Dispersed Groups,0,0</Value>
-				</Style>
+				</Symbol>
 			</Symbol>
 		</Symbology>
 	</GiGL_HistoricSpp>
@@ -565,22 +476,28 @@ used by the MapBasic tool to select and export data for the GiGL partners.
 
   <!-- The names and local names of the map tables and the required columns for the map tables -->
   <MapTables>
-	<GiGL_Hab>
+	<Habitat>
 		<TableName>
 			<Value>GiGL_Habitat</Value>
 		</TableName>
 	  	<Columns>
 			<Value>HabitatShortName, HabitatLongName, HabitatClassification, ClassificationVersion, NBN_biotope, SiteName, SiteNameOther, SiteRef, Borough, NBN_Loc, PolygonID, GISlinkID, OriginalPolygonRef, AreaHa, CentroidX, CentroidY, SurveyDate, Surveyor, DataCreatedDate, DataCreatedUser, DataCreatedComment, LastModifiedDate, LastModifiedUser, LastModifiedComment, BaseMap, Digitisation, FurtherInfo</Value>
 		</Columns>
-	</GiGL_Hab>
-	<GiGL_BAP_CA>
+		<Clause>
+			<Value></Value>
+		</Clause>
+	</Habitat>
+	<BAP_CA_S>
 		<TableName>
 			<Value>GiGL_BAP_Condition</Value>
 		</TableName>
 	  	<Columns>
 			<Value>ConditionShort, ConditionLong, SuitabilityShort, SuitabilityLong, OriginalHabShort, OriginalHabLong, SiteName, SiteNameOther, SiteRef, Borough, PolygonID, GISlinkID, OriginalPolygonRef, PolygonAreaHa, CentroidX, CentroidY, DataCreatedDate, DataCreatedUser, DataCreatedComment, BaseMap, Digitisation, FurtherInfo</Value>
 		</Columns>
-	</GiGL_BAP_CA>
+		<Clause>
+			<Value></Value>
+		</Clause>
+	</BAP_CA_S>
   </MapTables>
 
 </DataExtractor>

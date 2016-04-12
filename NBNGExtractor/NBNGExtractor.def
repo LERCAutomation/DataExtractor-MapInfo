@@ -1,23 +1,23 @@
-'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* NBNGExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
 '* Copyright © 2012-2013, 2015 Greenspace Information for Greater London (GiGL)
 '* Copyright © 2015 Andy Foy Consulting
 '* 
-'* This file is part of the MapInfo tool 'DataExtractor'.
+'* This file is part of the MapInfo tool 'NBNGExtractor'.
 '* 
-'* DataExtractor is free software: you can redistribute it and/or modify
+'* NBNGExtractor is free software: you can redistribute it and/or modify
 '* it under the terms of the GNU General Public License as published by
 '* the Free Software Foundation, either version 3 of the License, or
 '* (at your option) any later version.
 '* 
-'* DataExtractor is distributed in the hope that it will be useful,
+'* NBNGExtractor is distributed in the hope that it will be useful,
 '* but WITHOUT ANY WARRANTY; without even the implied warranty of
 '* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 '* GNU General Public License for more details.
 '* 
 '* You should have received a copy of the GNU General Public License
-'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'* along with NBNGExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
 '*

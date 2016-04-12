@@ -20,7 +20,7 @@
 '* along with NBNGExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* NBNGExtractor v1.57
+'* NBNGExtractor v1.58
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,15 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - March 2016
+'* Last revised:	Andy Foy - April 2016
+'*
+'* *****************  Version 1.58  *****************
+'* Author: Andy Foy		Date: 05/04/2016
+'* A. Fix premature disconnection error when dialog
+'*    remains open.
+'* B. Revert to original SQL store procedure.
+'* C. Save TXT files as comma-separated files.
+'* D. Add where clause option to Map tables.
 '*
 '* *****************  Version 1.57  *****************
 '* Author: Andy Foy		Date: 09/03/2016
@@ -77,7 +85,7 @@
 '* A. Initial version of code based.
 '* 
 '***************************************************************
-Include "DataExtractor.def"
+Include "NBNGExtractor.def"
 
 Sub Main
 '***************************************************************
@@ -87,7 +95,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.57"
+	sVersion = "1.58"
 
 	'-------------------------------------------------
 	' Create a new menu
@@ -236,21 +244,22 @@ Sub GetDefaultValues
 					'-------------------------------------------------
 					Dim i As Integer
 					i = 0
+					Redim SQLFiles(99)
 					Do while hXMLFilesNode
 						
 						i = i + 1
 
 						' Name of the table node
-						aFileSppNodes(i) = GetNodeName(hXMLFilesNode)
+						SQLFiles(i).Node = GetNodeName(hXMLFilesNode)
 
 						' Name of the MapInfo table to be created
-						aFileSppTables(i) = GetSingleNodeValue(hXMLFilesNode, "TableName")
+						SQLFiles(i).TableName = GetSingleNodeValue(hXMLFilesNode, "TableName")
 
 						' SQL statement used to retrieve the required columns from the temporary SQL table
-						aFileSppStmts(i) = GetSingleNodeValue(hXMLFilesNode, "Columns")
+						SQLFiles(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
 
 						' SQL clause used to retrieve the required rows from the temporary SQL table
-						aFileSppClauses(i) = GetSingleNodeValue(hXMLFilesNode, "Clauses")
+						SQLFiles(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clauses")
 
 						'-------------------------------------------------
 						' Get a handle on the next attribute in the node list
@@ -258,9 +267,7 @@ Sub GetDefaultValues
 						hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
 					Loop
 
-					Redim aFileSppNodes(i)
-					Redim aFileSppStmts(i)
-					Redim aFileSppClauses(i)
+					Redim SQLFiles(i)
 
 					'-------------------------------------------------
 					' Get a handle on the MapTables node
@@ -282,18 +289,22 @@ Sub GetDefaultValues
 					' storing the table names and columns and in arrays
 					'-------------------------------------------------
 					i = 0
+					Redim AllMaps(99)
 					Do while hXMLFilesNode
 						
 						i = i + 1
 
 						' Name of the Map node
-						aFileMapNodes(i) = GetNodeName(hXMLFilesNode)
+						AllMaps(i).Node = GetNodeName(hXMLFilesNode)
 
 						' Name of the MapInfo input and output Map table
-						aFileMapTables(i) = GetSingleNodeValue(hXMLFilesNode, "TableName")
+						AllMaps(i).TableName = GetSingleNodeValue(hXMLFilesNode, "TableName")
 
 						' SQL statement used to retrieve the required rows from the loaded map table
-						aFileMapStmts(i) = GetSingleNodeValue(hXMLFilesNode, "Columns")
+						AllMaps(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
+
+						' SQL clause used to retrieve the required rows from the loaded map table
+						AllMaps(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clause")
 
 						'-------------------------------------------------
 						' Get a handle on the next attribute in the node list
@@ -301,9 +312,7 @@ Sub GetDefaultValues
 						hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
 					Loop
 
-					Redim aFileMapNodes(i)
-					Redim aFileMapTables(i)
-					Redim aFileMapStmts(i)
+					Redim AllMaps(i)
 
 				End If
 
@@ -549,6 +558,8 @@ Sub DialogSetup
 		'-------------------------------------------------
 		Dim i as integer
 		i = 0
+		Redim PartnersList(199)
+		Redim Partners(199)
 		While i < iPartners
 	
 			i = i + 1
@@ -556,23 +567,20 @@ Sub DialogSetup
 			'-------------------------------------------------
 			' Concatenate all the partners into an array
 			'-------------------------------------------------
-			aPartners(i) = PartnerList.Col1
-			aShorts(i) = LTrim$(RTrim$(PartnerList.Col2))
-			aNotes(i) = LTrim$(RTrim$(PartnerList.Col3))
-			aFormats(i) = PartnerList.Col4
-			aExports(i) = PartnerList.Col5
-			aFiles(i) = PartnerList.Col6
+			PartnersList(i) = PartnerList.Col1
+			Partners(i).Name = PartnerList.Col1
+			Partners(i).Short = LTrim$(RTrim$(PartnerList.Col2))
+			Partners(i).Notes = LTrim$(RTrim$(PartnerList.Col3))
+			Partners(i).Formats = PartnerList.Col4
+			Partners(i).Exports = PartnerList.Col5
+			Partners(i).Files = PartnerList.Col6
 
 			Fetch Next from PartnerList
 	
 		Wend
 
-		Redim aPartners(i)
-		Redim aShorts(i)
-		Redim aNotes(i)
-		Redim aFormats(i)
-		Redim aExports(i)
-		Redim aFiles(i)
+		Redim PartnersList(i)
+		Redim Partners(i)
 		
 		'-------------------------------------------------
 		' Close the list of Partners
@@ -584,7 +592,7 @@ Sub DialogSetup
 	'-------------------------------------------------
 	' Update the Partner list to show the list of partners
 	'-------------------------------------------------
-	Alter Control 1 Title FROM Variable aPartners
+	Alter Control 1 Title FROM Variable PartnersList
 
 	'-------------------------------------------------
 	' Query all the tables in the database
@@ -595,9 +603,9 @@ Sub DialogSetup
 	'-------------------------------------------------
 	' Bind to the 1st column of the results
 	'-------------------------------------------------
-	Dim aSQLTable As String
+	Dim sSQLTable As String
 	Dim iStatus As Integer
-	Server nStmt Bind Column 1 To aSQLTable, iStatus
+	Server nStmt Bind Column 1 To sSQLTable, iStatus
 	Server nStmt Fetch Next
 
 	'-------------------------------------------------
@@ -605,18 +613,19 @@ Sub DialogSetup
 	' SQL criteria and add them to the SQL Tables list
 	'-------------------------------------------------
 	i = 0
+	Redim SQLTablesList(99)
 	While Not Server_Eot(nStmt)
 
 		'-------------------------------------------------
 		' Concatenate all the SQL tables into an array
 		'-------------------------------------------------
 		i = i + 1
-		aSQLTables(i) = aSQLTable
+		SQLTablesList(i) = sSQLTable
 		Server nStmt Fetch Next
 
 	Wend
 
-	Redim aSQLTables(i)
+	Redim SQLTablesList(i)
 
 	'-------------------------------------------------
 	' Close the query results
@@ -627,7 +636,7 @@ Sub DialogSetup
 	' Update the SQL Table list to show the list
 	' of tables
 	'-------------------------------------------------
-	Alter Control 2 Title FROM Variable aSQLTables
+	Alter Control 2 Title FROM Variable SQLTablesList
 
 	'-------------------------------------------------
 	' Store the names of any tables not open
@@ -643,29 +652,32 @@ Sub DialogSetup
 	'-------------------------------------------------
 	Dim j As Integer
 	j = 0
-	For i = 1 to UBound(aFileMapNodes)
+	Redim OpenMaps(99)
+	Redim OpenMapsList(99)
+	For i = 1 to UBound(AllMaps)
 
 		'-------------------------------------------------
 		' Concatenate all the Map tables into an array
 		'-------------------------------------------------
-		If TableIsOpen(aFileMapTables(i)) Then
+		If TableIsOpen(AllMaps(i).TableName) Then
 			j = j + 1
-			aMapNodes(j) = aFileMapNodes(i)
-			aMapTables(j) = aFileMapTables(i)
-			aMapStmts(j) = aFileMapStmts(i)
+			OpenMapsList(j) = AllMaps(i).TableName
+			OpenMaps(j).Node = AllMaps(i).Node
+			OpenMaps(j).TableName = AllMaps(i).TableName
+			OpenMaps(j).Columns = AllMaps(i).Columns
+			OpenMaps(j).Clauses = AllMaps(i).Clauses
 		Else
 			'-------------------------------------------------
 			' Store the name of the closed table
 			'-------------------------------------------------
-			sClosedTables = sClosedTables + Chr$(13) + aFileMapTables(i)
+			sClosedTables = sClosedTables + Chr$(13) + AllMaps(i).TableName
 			iClosedCount = iClosedCount + 1
 		End If
 
 	Next
 
-	Redim aMapNodes(j)
-	Redim aMapTables(j)
-	Redim aMapStmts(j)
+	Redim OpenMaps(j)
+	Redim OpenMapsList(j)
 
 	'-------------------------------------------------
 	' Warn the user of the closed tables
@@ -681,7 +693,7 @@ Sub DialogSetup
 	'-------------------------------------------------
 	' Update the Map Table list to show the list of tables
 	'-------------------------------------------------
-	Alter Control 3 Title FROM Variable aMapTables
+	Alter Control 3 Title FROM Variable OpenMapsList
 
 SetDefaults:
 	'-------------------------------------------------
@@ -747,10 +759,10 @@ Sub PartnerList_Handler
 	'-------------------------------------------------
 	If CommandInfo(CMD_INFO_DLG_DBL) Then
 		iPartner = ReadControlValue(TriggerControl())
-		If aNotes(iPartner) = "" Then
-			Note aPartners(iPartner) + " (" + aShorts(iPartner) + ") notes: " + Chr$(10) + Chr$(10) + "None"
+		If Partners(iPartner).Notes = "" Then
+			Note Partners(iPartner).Name + " (" + Partners(iPartner).Short + ") notes: " + Chr$(10) + Chr$(10) + "None"
 		Else
-			Note aPartners(iPartner) + " (" + aShorts(iPartner) + ") notes: " + Chr$(10) + Chr$(10) + "'" + aNotes(iPartner) + "'"
+			Note Partners(iPartner).Name + " (" + Partners(iPartner).Short + ") notes: " + Chr$(10) + Chr$(10) + "'" + Partners(iPartner).Notes + "'"
 		End If
 	End If
 
@@ -806,14 +818,16 @@ Sub CheckSelection
 			'-------------------------------------------------
 			iExtractTot = iExtractTot + 1
 
-			aNodeSelected(iExtractTot) = ""
-			aTableSelected(iExtractTot) = aSQLTables(iSQLTable)
-			aTableTypeSelected(iExtractTot) = "SQL"
-			aPartnerSelected(iExtractTot) = aPartners(iPartner)
-			aShortSelected(iExtractTot) = aShorts(iPartner)
-			aFormatSelected(iExtractTot) = aFormats(iPartner)
-			aExportSelected(iExtractTot) = aExports(iPartner)
-			aFilesSelected(iExtractTot) = aFiles(iPartner)
+			ProcessSelected(iExtractTot).Node = ""
+			ProcessSelected(iExtractTot).TableName = SQLTablesList(iSQLTable)
+			ProcessSelected(iExtractTot).TableType = "SQL"
+			ProcessSelected(iExtractTot).Partner = Partners(iPartner).Name
+			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
+			ProcessSelected(iExtractTot).Formats = Partners(iPartner).Formats
+			ProcessSelected(iExtractTot).Exports = Partners(iPartner).Exports
+			ProcessSelected(iExtractTot).Files = Partners(iPartner).Files
+			ProcessSelected(iExtractTot).Columns = ""
+			ProcessSelected(iExtractTot).Clauses = ""
 
 			'-------------------------------------------------
 			' Read the next table selected in the list
@@ -827,15 +841,16 @@ Sub CheckSelection
 			'-------------------------------------------------
 			iExtractTot = iExtractTot + 1
 
-			aNodeSelected(iExtractTot) = aMapNodes(iMapTable)
-			aTableSelected(iExtractTot) = aMapTables(iMapTable)
-			aTableTypeSelected(iExtractTot) = "Map"
-			aPartnerSelected(iExtractTot) = aPartners(iPartner)
-			aShortSelected(iExtractTot) = aShorts(iPartner)
-			aFormatSelected(iExtractTot) = aFormats(iPartner)
-			aExportSelected(iExtractTot) = aExports(iPartner)
-			aFilesSelected(iExtractTot) = aFiles(iPartner)
-			aMapStmtSelected(iExtractTot) = aMapStmts(iMapTable)
+			ProcessSelected(iExtractTot).Node = OpenMaps(iMapTable).Node
+			ProcessSelected(iExtractTot).TableName = OpenMaps(iMapTable).TableName
+			ProcessSelected(iExtractTot).TableType = "Map"
+			ProcessSelected(iExtractTot).Partner = Partners(iPartner).Name
+			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
+			ProcessSelected(iExtractTot).Formats = Partners(iPartner).Formats
+			ProcessSelected(iExtractTot).Exports = Partners(iPartner).Exports
+			ProcessSelected(iExtractTot).Files = Partners(iPartner).Files
+			ProcessSelected(iExtractTot).Columns = OpenMaps(iMapTable).Columns
+			ProcessSelected(iExtractTot).Clauses = OpenMaps(iMapTable).Clauses
 
 			'-------------------------------------------------
 			' Read the next table selected in the list
@@ -917,17 +932,17 @@ Sub CheckSelection
 		'-------------------------------------------------
 		Dialog Remove
 
+		'-------------------------------------------------
+		' Disconnect the connection to the SQL Server database
+		'-------------------------------------------------
+		Server nConn Disconnect
+
 	End If
 
 	'-------------------------------------------------
 	' Display the log file in the message window
 	'-------------------------------------------------
 	Call PrintLogFile
-
-	'-------------------------------------------------
-	' Disconnect the connection to the SQL Server database
-	'-------------------------------------------------
-	Server nConn Disconnect
 
 End Sub
 
@@ -936,16 +951,17 @@ Sub ProcessExtracts
 '* Process each combination of table and partner
 '***************************************************************
 
-	Dim sNodeName, sTableName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapStmt As String
-	sNodeName = aNodeSelected(iExtractCnt)
-	sTableName = aTableSelected(iExtractCnt)
-	sTableType = aTableTypeSelected(iExtractCnt)
-	sPartnerName = aPartnerSelected(iExtractCnt)
-	sShortName = aShortSelected(iExtractCnt)
-	sFormat = aFormatSelected(iExtractCnt)
-	sExport = aExportSelected(iExtractCnt)
-	sFiles = aFilesSelected(iExtractCnt)
-	sMapStmt = aMapStmtSelected(iExtractCnt)
+	Dim sNodeName, sTableName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses As String
+	sNodeName = ProcessSelected(iExtractCnt).Node
+	sTableName = ProcessSelected(iExtractCnt).TableName
+	sTableType = ProcessSelected(iExtractCnt).TableType
+	sPartnerName = ProcessSelected(iExtractCnt).Partner
+	sShortName = ProcessSelected(iExtractCnt).Short
+	sFormat = ProcessSelected(iExtractCnt).Formats
+	sExport = ProcessSelected(iExtractCnt).Exports
+	sFiles = ProcessSelected(iExtractCnt).Files
+	sMapColumns = ProcessSelected(iExtractCnt).Columns
+	sMapClauses = ProcessSelected(iExtractCnt).Clauses
 
 	'-------------------------------------------------
 	' If this is a new partner ...
@@ -1012,7 +1028,7 @@ Sub ProcessExtracts
 
 		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
-		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapStmt)
+		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapColumns, sMapClauses)
 	End If
 
 	Call MyPrint("Completed process " + iExtractCnt + " of " + iExtractTot + ".")
@@ -1133,16 +1149,16 @@ Sub SelectSQL (ByVal nConn As Integer,
 	'-------------------------------------------------
 	Dim i As Integer
 	Dim sNodeName, sLocalName as String
-	For i = 1 to UBound(aFileSppNodes)
+	For i = 1 to UBound(SQLFiles)
 
 		'-------------------------------------------------
 		' If this SQL clause is found in the partner
 		' table record then process it, otherwise skip
 		' to the next SQL clause.
 		'-------------------------------------------------
-		sNodeName = aFileSppNodes(i)
+		sNodeName = SQLFiles(i).Node
 		If Instr(1, Ucase$(sFiles), Ucase$(sNodeName)) > 0 then
-			sLocalName = aFileSppTables(i)
+			sLocalName = SQLFiles(i).TableName
 		Else
 			Goto NextClause
 		End If
@@ -1168,7 +1184,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		Dim nStmt2 As Integer
 		Dim iRecTotal As Integer
 		Dim iRecStatus As Integer
-		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause)
+		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sTempName + " " + SQLFiles(i).Clauses + " " + sExtraSQLClause)
 		Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
 		Server nStmt2 Fetch Next
 
@@ -1219,7 +1235,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' temporary table (to check the record length)
 		'-------------------------------------------------
 		Dim sSQLStmt As String
-		sSQLStmt = "Select Top(0) " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause
+		sSQLStmt = "Select Top(0) " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " Where " + SQLFiles(i).Clauses + " " + sExtraSQLClause
 
 		'-------------------------------------------------
 		' Link the temporary table as a local table
@@ -1334,7 +1350,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' Set up the SQL statement for extracting from
 		' the temporary table
 		'-------------------------------------------------
-		sSQLStmt = "Select " + aFileSppStmts(i) + " From " + sDefaultSchema + "." + sTempName + " " + aFileSppClauses(i) + " " + sExtraSQLClause
+		sSQLStmt = "Select " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " Where " + SQLFiles(i).Clauses + " " + sExtraSQLClause
 
 		'-------------------------------------------------
 		' Link the temporary table as a local table
@@ -1570,7 +1586,7 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 		' Load the document into the document handle
 		'-------------------------------------------------
 		Dim iXMLLoad As SmallInt
-		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "NBNGExtractor.xml", bParseError, FALSE, FALSE)
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
 		if iXMLLoad > 0 Then
 
 			'-------------------------------------------------
@@ -1580,9 +1596,9 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 			If hXMLRoot Then
 
 				'-------------------------------------------------
-				' Get a handle on the NBNGExtractor node
+				' Get a handle on the DataExtractor node
 				'-------------------------------------------------
-				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "NBNGExtractor")
+				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
 	          	If hXMLNode Then
 	
 					'-------------------------------------------------
@@ -1759,7 +1775,8 @@ Sub SelectMaps (sPartnerName As String,
 	sFiles As String,
 	sNodeName as String,
 	sTableName As String,
-	sMapStmt As String)
+	sMapColumns As String,
+	sMapClauses As String)
 '*************************************************
 '* Routine to select the records from the
 '* MapInfo table name passed in the call that
@@ -1821,7 +1838,13 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	Call MyPrint("Executing spatial selection ...")
 	Dim sCmd As String
-	sCmd = "Select " + sMapStmt + " from " + sTableName + " Where obj Intersects (Select obj from " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") Into " + sLocalName + "_" + sShortName + " NoSelect"
+	Dim sWhereClause As string
+	If sMapClauses = "" Then
+		sWhereClause = ""
+	Else
+		sWhereClause = " And " + sMapClauses
+	End If
+	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sWhereClause + " Into " + sLocalName + "_" + sShortName + " NoSelect"
 	Run Command (sCmd)
 
 	'-------------------------------------------------
