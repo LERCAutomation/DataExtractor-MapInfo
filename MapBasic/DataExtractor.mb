@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.58
+'* DataExtractor v1.5.11
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,21 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - April 2016
+'* Last revised:	Andy Foy - July 2016
+'*
+'* *****************  Version 1.5.11  ***************
+'* Author: Andy Foy		Date: 13/07/2016
+'* A. Get path and command for universal translator from
+'*    config file and pass to sub-routine.
+'*
+'* *****************  Version 1.5.10  ***************
+'* Author: Andy Foy		Date: 11/07/2016
+'* A. Enable separate instances for tool to run under
+'*    different names in Tool menu.
+'*
+'* *****************  Version 1.5.9  ****************
+'* Author: Andy Foy		Date: 30/05/2016
+'* A. Change version number to 3 parts.
 '*
 '* *****************  Version 1.58  *****************
 '* Author: Andy Foy		Date: 05/04/2016
@@ -95,23 +109,108 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.58"
+	sVersion = "1.5.11"
+
+	'-------------------------------------------------
+	' Get the title for the Tool menu
+	'-------------------------------------------------
+	Call GetToolTitle
 
 	'-------------------------------------------------
 	' Create a new menu
 	'-------------------------------------------------
-	Create Menu "&Data Extractor" As
-	   "&Run Data Extractor ..." Calling OpenDialog,
+	Create Menu "&" & sToolTitle As
+	   "&Run " & sToolTitle & " ..." Calling OpenDialog,
 	   "(-",
-	   "&About Data Extractor ..." Calling AboutBox,
-	   "E&xit Data Extractor" Calling egsit
+	   "&About " & sToolTitle & " ..." Calling AboutBox,
+	   "E&xit " & sToolTitle Calling egsit
 
 	'-------------------------------------------------
 	' Add the new menu item to the Tools menu
 	'-------------------------------------------------
 	Alter Menu "Tools" Add
-		"Data Extractor" As "Data Extractor"
+		sToolTitle As sToolTitle
 
+	Exit Sub
+
+End Sub
+
+Sub GetToolTitle
+'***************************************************************
+'* Retrieve the tool title to use from the config file
+'* which is a XML document
+'***************************************************************
+
+	Dim bParseError As SmallInt
+	Dim hXMLDoc As MIXmlDocument
+	Dim hXMLRoot As MIXmlNode
+	Dim hXMLNode As MIXmlNode
+
+	OnError Goto GetTitleError
+
+	' Set the default Tool menu title
+	sToolTitle = "Data Extractor"
+
+	'-------------------------------------------------
+	' Create a document handle
+	'-------------------------------------------------
+	hXMLDoc = MIXmlDocumentCreate()
+	If hXMLDoc Then
+
+		'-------------------------------------------------
+		' Load the document into the document handle
+		'-------------------------------------------------
+		Dim iXMLLoad As SmallInt
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		if iXMLLoad > 0 Then
+
+			'-------------------------------------------------
+			' Get a handle on the XML root node of the document
+			'-------------------------------------------------
+			hXMLRoot = MIXmlDocumentGetRootNode(hXMLDoc)
+			If hXMLRoot Then
+
+				'-------------------------------------------------
+				' Get a handle on the DataExtractor node
+				'-------------------------------------------------
+				hXMLNode = MIXmlSelectSingleNode(hXMLRoot, "DataExtractor")
+	          	If hXMLNode Then
+	
+					'-------------------------------------------------
+					' Load the default values from the child nodes
+					' under the DataExtractor node
+					'-------------------------------------------------
+					' Title for adding the program to the Tool menu
+					Dim sTitle As String
+					sTitle = GetSingleNodeValue(hXMLNode, "ToolTitle")
+					If sTitle <> "" Then
+						sToolTitle = sTitle
+					End If
+
+				End If
+
+			End If
+
+		Else
+
+			Goto GetTitleError
+
+		End If
+
+	End If
+
+CleanUp:
+	'-------------------------------------------------
+	' Destroy the handles
+	'-------------------------------------------------
+	If hXMLNode Then Call MIXmlNodeDestroy(hXMLNode) End If
+	If hXMLRoot Then Call MIXmlNodeDestroy(hXMLRoot) End If
+	If hXMLDoc Then Call MIXmlDocumentDestroy(hXMLDoc) End If
+
+	Exit Sub
+
+GetTitleError:
+	Note "Unable to get tool title from XML config file.  Using default title 'Data Extractor'."
 	Exit Sub
 
 End Sub
@@ -223,6 +322,12 @@ Sub GetDefaultValues
 					' Default setting for extracting confidential surveys
 					sDefaultConfidential = GetSingleNodeValue(hXMLNode, "DefaultConfidential")
 
+					' Path to universal translator program
+					sUTPath = GetSingleNodeValue(hXMLNode, "UTPath")
+
+					' Command for running universal translator program
+					sUTCommand = GetSingleNodeValue(hXMLNode, "UTCommand")
+
 					'-------------------------------------------------
 					' Get a handle on the SQLTables node
 					'-------------------------------------------------
@@ -320,7 +425,7 @@ Sub GetDefaultValues
 
 		Else
 
-			Note "Error : " + MIGetErrorMessage()
+			Note "Error opening XML config file 'DataExtractor.xml'."
 
 		End If
 
@@ -484,7 +589,7 @@ Done:
 	
 ErrorTrap:
 	Note str$(Err()) + ": " + Error$()
-	Call MyPrint(str$(Err()) + ": " + Error$())
+	Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
 	Resume Done
 
 End Sub
@@ -1166,14 +1271,22 @@ Sub SelectSQL (ByVal nConn As Integer,
 		Call MyPrint("Extracting '" + sLocalName + "' ...")
 
 		'-------------------------------------------------
-		' Clear the SQL clause that excludes the
-		' confidential surveys if they are required
+		' Set the SQL clause, excluding any
+		' confidential surveys if they are not required
 		'-------------------------------------------------
-		Dim sExtraSQLClause As String
-		If bConfidentialSurveys = True Then
-			sExtraSQLClause = ""
+		Dim sSQLClause As String
+		If SQLFiles(i).Clauses = "" Then
+			If bConfidentialSurveys = True Or sConfidentialClause = "" Then
+				sSQLClause = ""
+			Else
+				sSQLClause = "Where " & sConfidentialClause
+			End If
 		Else
-			sExtraSQLClause = sConfidentialClause
+			If bConfidentialSurveys = True Or sConfidentialClause = "" Then
+				sSQLClause = "Where " & SQLFiles(i).Clauses
+			Else
+				sSQLClause = "Where " & SQLFiles(i).Clauses & " And " & sConfidentialClause
+			End If
 		End If
 
 		'-------------------------------------------------
@@ -1183,7 +1296,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		Dim nStmt2 As Integer
 		Dim iRecTotal As Integer
 		Dim iRecStatus As Integer
-		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sTempName + " " + SQLFiles(i).Clauses + " " + sExtraSQLClause)
+		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sTempName + " " + sSQLClause)
 		Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
 		Server nStmt2 Fetch Next
 
@@ -1234,7 +1347,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' temporary table (to check the record length)
 		'-------------------------------------------------
 		Dim sSQLStmt As String
-		sSQLStmt = "Select Top(0) " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " Where " + SQLFiles(i).Clauses + " " + sExtraSQLClause
+		sSQLStmt = "Select Top(0) " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " " + sSQLClause
 
 		'-------------------------------------------------
 		' Link the temporary table as a local table
@@ -1349,7 +1462,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' Set up the SQL statement for extracting from
 		' the temporary table
 		'-------------------------------------------------
-		sSQLStmt = "Select " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " Where " + SQLFiles(i).Clauses + " " + sExtraSQLClause
+		sSQLStmt = "Select " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " " + sSQLClause
 
 		'-------------------------------------------------
 		' Link the temporary table as a local table
@@ -1448,7 +1561,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 
 			'Call MyPrint("Log File Path = '" + sLogFilePath + "'")
 
-			Call TranslateToShapefile(sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
+			Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
 		End If
 
 		'-------------------------------------------------
@@ -1552,7 +1665,7 @@ NextClause:
 	
 ErrorTrap:
 	Note str$(Err()) + ": " + Error$()
-	Call MyPrint(str$(Err()) + ": " + Error$())
+	Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
 	Exit Sub
 
 End Sub
@@ -1859,7 +1972,6 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	If iRecTotal > iRecMax Then
 		Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
-		Call MyPrint("")
 		Exit Sub
 	End If
 
@@ -1868,7 +1980,6 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	If iRecTotal = 0 Then
 		Call MyPrint("No records found - extract skipped.")
-		Call MyPrint("")
 		Exit Sub
 	End If
 
@@ -1932,7 +2043,7 @@ Sub SelectMaps (sPartnerName As String,
 		sLogFilePath = PathToDirectory$(sLogFileName)
 		sLogFileShp = "TabToShp" + "_" + sUserID
 
-		Call TranslateToShapefile(sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
+		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
 	End If
 
 	'-------------------------------------------------
@@ -1961,7 +2072,7 @@ Sub SelectMaps (sPartnerName As String,
 	
 ErrorTrap:
 	Note str$(Err()) + ": " + Error$()
-	Call MyPrint(str$(Err()) + ": " + Error$())
+	Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
 	Exit Sub
 
 End Sub

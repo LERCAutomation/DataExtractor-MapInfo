@@ -23,6 +23,11 @@ used by the MapBasic tool to select and export data for partners.
 <configuration>
 <DataExtractor>
 
+  <!-- The title to use for the program in the Tool menu -->
+  <ToolTitle>
+	<value>Data Extractor - Partners</value>
+  </ToolTitle>
+
   <!-- The existing file location where log files will be saved with output messages -->
   <LogFilePath>
 	<value>D:\LRCs\GiGL\Data Exchange\Logs</value>
@@ -126,13 +131,23 @@ used by the MapBasic tool to select and export data for partners.
 
   <!-- The SQL criteria for excluding any confidential species records -->
   <ConfidentialClause>
-	<value> AND R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
+	<value>R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
   </ConfidentialClause>
 
   <!-- The default value for extracting confidential surveys -->
   <DefaultConfidential>
 	<value>No</value>
   </DefaultConfidential>
+
+  <!-- The path to the Universal Translator program -->
+  <UTPath>
+	<value>C:\Program Files (x86)\MapInfo\Professional\UT</value>
+  </UTPath>
+
+  <!-- The command to run the Universal Translator program -->
+  <UTCommand>
+	<value>Imut.exe</value>
+  </UTCommand>
 
   <!-- The table columns and SQL where clauses used to select all the required columns for
 	the extract tables -->
@@ -145,7 +160,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE RECORDYEAR &gt;= 1985 AND (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>RECORDYEAR &gt;= 1985 AND (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -180,7 +195,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND (STATUS_PLANNING IS NOT NULL OR STATUS_OTHER IS NOT NULL) AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>(NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND (STATUS_PLANNING IS NOT NULL OR STATUS_OTHER IS NOT NULL) AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -215,7 +230,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND STATUS_LISI IS NOT NULL AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>(NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND STATUS_LISI IS NOT NULL AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -250,7 +265,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND TAXONOMIC_GROUP = 'bird' AND GRIDREF IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>(NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND TAXONOMIC_GROUP = 'bird' AND GRIDREF IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -285,7 +300,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE NEG_RECORD = 'Y' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>NEG_RECORD = 'Y' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -320,7 +335,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE GRPRECISION &gt;100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>GRPRECISION &gt;100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -375,7 +390,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE TAXONOMIC_GROUP = 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>TAXONOMIC_GROUP = 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -410,7 +425,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE TAXONOMIC_GROUP &lt;&gt; 'bird' AND TAXONOMIC_GROUP &lt;&gt; 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>TAXONOMIC_GROUP &lt;&gt; 'bird' AND TAXONOMIC_GROUP &lt;&gt; 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>
@@ -445,7 +460,7 @@ used by the MapBasic tool to select and export data for partners.
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
 		<Clauses>
-			<Value>WHERE RECORDYEAR &lt; 1985 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+			<Value>RECORDYEAR &lt; 1985 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</Clauses>
 		<Symbology>
 			<Symbol>

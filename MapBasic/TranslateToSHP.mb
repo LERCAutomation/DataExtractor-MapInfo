@@ -26,8 +26,13 @@
 '* ESRI .shp files.
 '*
 '*
-'* Created:			Andy Foy - February 2013
-'* Last revised:		Andy Foy - September 2015
+'* Created:				Andy Foy - February 2013
+'* Last revised:		Andy Foy - July 2016
+'*
+'* *****************  Version 1.42  *****************
+'* Author: Andy Foy		Date: 13/07/2016
+'* A. Pass path and command for universal translator to
+'*    sub-routine.
 '*
 '* *****************  Version 1.41  *****************
 '* Author: Andy Foy		Date: 21/09/2015
@@ -36,19 +41,22 @@
 '***************************************************************
 Include "DataExtractor.def"
 
-Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath As String, sLocalName As String)
+Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath As String, sTempName As String, sLocalPath As String, sLocalName As String)
 '*************************************************
 '* Routine to translate a MapInfo table name
 '* passed in the call into an ESRI shapefile
 '*************************************************
 
-	Call MyPrint("Translating to a SHP ...")
+	Call MyPrint("Translating to a SHP file ...")
 	
 	'-------------------------------------------------
-	' Set the current directory to the Universal Translator directory
-	' (assumimg you're running from IMUT.exe Directory)
+	' Set the current directory to the Universal
+	' Translator directory
 	'-------------------------------------------------
-	Call SetUTDirectory(ProgramDirectory$()+ "UT\")
+	Call MyPrint("Switching to Universal Translator directory ... " + sUTPath)
+
+	'Call SetUTDirectory(ProgramDirectory$()+ "UT\")
+	Call SetUTDirectory(sUTPath)
 	
 	Dim sInputFile as string
 	Dim sMappingFile as string
@@ -65,13 +73,14 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 
 	If Right$(sDefaultPath, 1) = "\" Then
 		sMappingFile = sDefaultPath + sTempName + ".fme"
+		sLogFile = sDefaultPath + sTempName + "_MUT.log"
 	Else
 		sMappingFile = sDefaultPath + "\" + sTempName + ".fme"
+		sLogFile = sDefaultPath + "\" + sTempName + "_MUT.log"
 	End if
 
-	sLogFile = sDefaultPath + "\" + sTempName + "_MUT.log"
-
-	Call AmendVersion(sInputFile)
+	'Call MyPrint("Amending MapInfo version in .tab file ...")
+	'Call AmendVersion(sInputFile)
 
 	'-------------------------------------------------
 	' Get the version of MI currently running, multiplied
@@ -80,11 +89,14 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 	Dim iMIVersion As Integer
 	iMIVersion = SystemInfo(SYS_INFO_MIVERSION)
 	
+	Call MyPrint("Current MapInfo version is ... " + iMIVersion)
+
 	'-------------------------------------------------
 	' Create the mapping file command string
 	'-------------------------------------------------
 	Dim sMUTGenerate as string
-	if iMIVersion >= 1200 Then
+	'if iMIVersion >= 1200 Then
+	if UCase$(sUTCommand) = "FME.EXE" Then
 		sMUTGenerate = "Fme.exe GENERATE MAPINFO SHAPE "
 	Else
 		sMUTGenerate = "Imut.exe CFGenerate MAPINFO SHAPE "
@@ -94,7 +106,8 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 		chr$(34) + sInputFile + chr$(34) + " " +
 		chr$(34) + sMappingFile + chr$(34)
 
-	if iMIVersion >= 1200 Then
+	'if iMIVersion >= 1200 Then
+	if UCase$(sUTCommand) = "FME.EXE" Then
 		sMUTGenerate = sMUTGenerate +
 		" --SourceSourceDataset " + 
 		chr$(34) + sInputFile + chr$(34) + " " +
@@ -110,6 +123,8 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 	'-------------------------------------------------
 	' Execute the command and wait for it to finish
 	'-------------------------------------------------
+	Call MyPrint("Creating Universal Translator mapping file ...")
+
 	If ExecuteAndWait(sMUTGenerate) > 0 then
 		Call MyPrint("Error creating Mapping file - process terminated.")
 		Call MyPrint("")
@@ -121,7 +136,8 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 	' file through the Universal Translator
 	'-------------------------------------------------
 	Dim sMUTRunCmd as string
-	if iMIVersion >= 1200 Then
+	'if iMIVersion >= 1200 Then
+	if UCase$(sUTCommand) = "FME.EXE" Then
 		sMUTRunCmd = "Fme.exe " + chr$(34) + sMappingFile + chr$(34)
 	Else
 		sMUTRunCmd = "Imut.exe " + chr$(34) + sMappingFile + chr$(34)
@@ -144,6 +160,8 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 		'-------------------------------------------------
 		' Execute the command and wait for it to finish
 		'-------------------------------------------------
+		Call MyPrint("Executing Universal Translator ...")
+
 		If ExecuteAndWait(sMUTRunCmd) > 0 then
 			Call MyPrint("Error translating to SHP file - process terminated.")
 			Call MyPrint("")
@@ -155,6 +173,8 @@ Sub TranslateToShapefile(sDefaultPath As String, sTempName As String, sLocalPath
 		Exit Sub
 	End if
 
+	Call MyPrint("Translation to a SHP file complete.")
+	
 End Sub
 
 Sub SetUTDirectory(ByVal sPath as string)

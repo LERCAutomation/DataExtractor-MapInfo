@@ -116,6 +116,7 @@ Define MIWEBSERVICES_LIB_NAME "GmlXlat.dll"
 ' Declare the subroutines
 '-------------------------------------------------
 Declare Sub Main
+Declare Sub GetToolTitle
 Declare Sub GetDefaultValues
 Declare Sub OpenDialog
 Declare Sub DialogSetup
@@ -155,7 +156,9 @@ Declare Sub SetUTDirectory
 Declare Sub AmendVersion
 	(ByVal sFileName As String)
 Declare Sub TranslateToShapefile
-	(sDefaultPath As String,
+	(sUTPath As String,
+	sUTCommand As String,
+	sDefaultPath As String,
 	sLocalPath As String,
 	sLocalName As String,
 	sShortName As String)
@@ -300,6 +303,7 @@ Declare Function MIGetErrorCode Lib MIWEBSERVICES_LIB_NAME
 '-------------------------------------------------
 Global sVersion As String
 Global sUserId As String
+Global sToolTitle As String
 
 Global sDefaultPath As String
 Global sFileDSN As String
@@ -320,6 +324,8 @@ Global iRecMax As Integer
 Global sDefaultZip As String
 Global sConfidentialClause As String
 Global sDefaultConfidential As String
+Global sUTPath As String
+Global sUTCommand As String
 
 Global sPartnerListSQL As String
 Global sLogFileName As String
@@ -329,53 +335,17 @@ Global sEastingCol As String
 Global sNorthingCol As String
 Global sPrecisionCol As String
 
-
-'Global aPartners(199) As String
-'Global aShorts(199) As String
-'Global aNotes(199) As String
-'Global aFormats(199) As String
-'Global aExports(199) As String
-'Global aFiles(199) As String
-
 Global Partners(199) As PartnerDetails
 Global PartnersList(199) As String
 
 Global SQLTablesList(99) As String
 Global OpenMapsList(99) As String
 
-'Global aMapNodes(99) As String
-'Global aMapTables(99) As String
-'Global aMapStmts(99) As String
-
-'Global aFileSppNodes(99) As String
-'Global aFileSppTables(99) As String
-'Global aFileSppStmts(99) As String
-'Global aFileSppClauses(99) As String
-
-'Global aFileMapNodes(99) As String
-'Global aFileMapTables(99) As String
-'Global aFileMapStmts(99) As String
-
-
 Global SQLFiles(99) As FileDetails
 Global AllMaps(99) As MapDetails
 Global OpenMaps(99) As MapDetails
 
-
-
-'Global aNodeSelected(999) As String
-'Global aTableSelected(999) As String
-'Global aTableTypeSelected(999) As String
-'Global aPartnerSelected(999) As String
-'Global aShortSelected(999) As String
-'Global aFormatSelected(999) As String
-'Global aExportSelected(999) As String
-'Global aFilesSelected(999) As String
-'Global aMapStmtSelected(999) As String
-
-
 Global ProcessSelected(999) As ProcessDetails
-
 
 Global iExtractTot As Integer
 Global iExtractCnt As Integer
