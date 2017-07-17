@@ -1,8 +1,8 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012-2013, 2015 Greenspace Information for Greater London (GiGL)
-'* Copyright © 2015 Andy Foy Consulting
+'* Copyright © 2012-2013, 2015-2017 Greenspace Information for Greater London (GiGL)
+'* Copyright © 2015-2017 Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -80,7 +80,8 @@ Type PartnerDetails
 	Notes As String
 	Formats As String
 	Exports As String
-	Files As String
+	SQLFiles As String
+	MapFiles As String
 End Type
 
 Type ProcessDetails
@@ -128,7 +129,7 @@ Declare Sub SelectSQL
 	sShortName As String,
 	sFormat As String,
 	sExport As String,
-	sFiles As String,
+	sSQLFiles As String,
 	iSelectType As Integer,
 	sTableName As String)
 Declare Sub SetSymbology
@@ -140,7 +141,7 @@ Declare Sub SelectMaps
 	sShortName As String,
 	sFormat As String,
 	sExport As String,
-	sFiles As String,
+	sMapFiles As String,
 	sNodeName as String,
 	sTableName As String,
 	sMapColumns As String,
@@ -316,7 +317,8 @@ Global sNotesColumn As String
 Global sActiveColumn As String
 Global sFormatColumn As String
 Global sExportColumn As String
-Global sFilesColumn As String
+Global sSQLFilesColumn As String
+Global sMapFilesColumn As String
 Global sTagsColumn As String
 Global sSelectTypeOptions As String
 Global iDefaultSelectType As Integer

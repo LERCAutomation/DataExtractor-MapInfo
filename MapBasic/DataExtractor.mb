@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.11
+'* DataExtractor v1.5.13
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,20 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - July 2016
+'* Last revised:	Andy Foy - May 2017
+'*
+'* *****************  Version 1.5.13  ***************
+'* Author: Andy Foy		Date: 01/05/2017
+'* A. Split files into separate columns.
+'* B. Fix bug with map tables not being closed when
+'*    empty.
+'* C. Display file node and table name in map tables
+'*    list.
+'*
+'* *****************  Version 1.5.12  ***************
+'* Author: Andy Foy		Date: 25/01/2017
+'* A. Remove hard-coded check for 'GRPrecision' column,
+'*    enable symbology clauses to be blank.
 '*
 '* *****************  Version 1.5.11  ***************
 '* Author: Andy Foy		Date: 13/07/2016
@@ -109,7 +122,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.11"
+	sVersion = "1.5.13"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -295,8 +308,11 @@ Sub GetDefaultValues
 					' Name of column of Export to text format in the partner table
 					sExportColumn = GetSingleNodeValue(hXMLNode, "ExportColumn")
 
-					' Name of column of Files list in the partner table
-					sFilesColumn = GetSingleNodeValue(hXMLNode, "FilesColumn")
+					' Name of column of SQL Files list in the partner table
+					sSQLFilesColumn = GetSingleNodeValue(hXMLNode, "SQLFilesColumn")
+
+					' Name of column of Map Files list in the partner table
+					sMapFilesColumn = GetSingleNodeValue(hXMLNode, "MapFilesColumn")
 
 					' Name of column of Tags list in the partner table
 					sTagsColumn = GetSingleNodeValue(hXMLNode, "TagsColumn")
@@ -435,7 +451,7 @@ Sub GetDefaultValues
 	' Build the SQL used to list the partner names
 	' from the partner MapInfo table
 	'-------------------------------------------------
-	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sFilesColumn + 
+	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sSQLFilesColumn +  ", " + sMapFilesColumn + 
 		" From " + sPartnerTable +
 		" Where " + sActiveColumn + " = " + Chr$(34) + "Y" + Chr$(34) + " Or " + sActiveColumn + " = " + Chr$(34) + "y" + Chr$(34) + 
 		" Order By " + sPartnerColumn +
@@ -487,8 +503,8 @@ Sub OpenDialog
 	'-------------------------------------------------
 	Dialog
 		Title "Data Extractor " + sVersion
-		Width 300
-		Height 260
+		Width 370
+		Height 270
 		Position 50, 70
 		Calling DialogSetup
 
@@ -501,7 +517,7 @@ Sub OpenDialog
 		ID 1
 		Title ""
 		Position 10, 20
-		Height 170
+		Height 180
 		Width 170
 		Calling PartnerList_Handler
 
@@ -509,25 +525,25 @@ Sub OpenDialog
 	' Add a SQL table listbox
 	'-------------------------------------------------
 	Control StaticText Title "SQL Tables:"
-		Position 190,10
+		Position 190, 10
 	Control MultiListBox
 		ID 2
 		Title ""
 		Position 190, 20
-		Height 30
-		Width 100
+		Height 40
+		Width 170
 
 	'-------------------------------------------------
 	' Add a MapInfo table listbox
 	'-------------------------------------------------
 	Control StaticText Title "MapInfo Tables:"
-		Position 190,60
+		Position 190, 70
 	Control MultiListBox
 		ID 3
 		Title ""
-		Position 190, 70
+		Position 190, 80
 		Height 120
-		Width 100
+		Width 170
 
 	'-------------------------------------------------
 	' Add a checkbox for zipping the extract files
@@ -535,7 +551,7 @@ Sub OpenDialog
 	Control CheckBox
 		ID 4
 		Title "Zip extract files?"
-		Position 10,200
+		Position 10,210
 		Value FALSE
 		'Into bZipFiles
 
@@ -545,7 +561,7 @@ Sub OpenDialog
 	Control CheckBox
 		ID 5
 		Title "Extract confidential surveys?"
-		Position 10,215
+		Position 10,225
 		Value FALSE
 		'Into bConfidentialSurveys
 
@@ -555,32 +571,32 @@ Sub OpenDialog
 	Control CheckBox
 		ID 6
 		Title "Clear log file?"
-		Position 10,230
-		Value TRUE
+		Position 10,240
+		Value FALSE
 		'Into bClearLog
 
 	'-------------------------------------------------
 	' Add a popup menu for picking the select type
 	'-------------------------------------------------
 	Control StaticText Title "Selection Type:"
-		Position 190,200
+		Position 190,210
 	Control PopupMenu
 		ID 7
 		Value iDefaultSelectType
 		Title From Variable sSelectTypeOptions
-		Position 190,210
-		Width 100
+		Position 190,220
+		Width 170
 		'Into iSelectType
 
 	'-------------------------------------------------
 	' Add Ok and cancel buttons
 	'-------------------------------------------------
 	Control CancelButton
-		Position 205,240
+		Position 275,250
 		Width 40
 	Control Button
 		Title "Ok"
-		Position 250,240
+		Position 320,250
 		Width 40
 		Calling CheckSelection
 
@@ -654,7 +670,7 @@ Sub DialogSetup
 		'-------------------------------------------------
 		Fetch First from PartnerList
 
-		Dim sPartner, sShort, sNote, sFormat, sExport, sFiles As String
+		Dim sPartner, sShort, sNote, sFormat, sExport, sSQLFiles, sMapFiles As String
 
 		'-------------------------------------------------
 		' Loop through all the partners in the partners
@@ -677,7 +693,8 @@ Sub DialogSetup
 			Partners(i).Notes = LTrim$(RTrim$(PartnerList.Col3))
 			Partners(i).Formats = PartnerList.Col4
 			Partners(i).Exports = PartnerList.Col5
-			Partners(i).Files = PartnerList.Col6
+			Partners(i).SQLFiles = PartnerList.Col6
+			Partners(i).MapFiles = PartnerList.Col7
 
 			Fetch Next from PartnerList
 	
@@ -765,7 +782,7 @@ Sub DialogSetup
 		'-------------------------------------------------
 		If TableIsOpen(AllMaps(i).TableName) Then
 			j = j + 1
-			OpenMapsList(j) = AllMaps(i).TableName
+			OpenMapsList(j) = AllMaps(i).Node + " ---> " + AllMaps(i).TableName
 			OpenMaps(j).Node = AllMaps(i).Node
 			OpenMaps(j).TableName = AllMaps(i).TableName
 			OpenMaps(j).Columns = AllMaps(i).Columns
@@ -929,7 +946,7 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
 			ProcessSelected(iExtractTot).Formats = Partners(iPartner).Formats
 			ProcessSelected(iExtractTot).Exports = Partners(iPartner).Exports
-			ProcessSelected(iExtractTot).Files = Partners(iPartner).Files
+			ProcessSelected(iExtractTot).Files = Partners(iPartner).SQLFiles
 			ProcessSelected(iExtractTot).Columns = ""
 			ProcessSelected(iExtractTot).Clauses = ""
 
@@ -952,7 +969,7 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
 			ProcessSelected(iExtractTot).Formats = Partners(iPartner).Formats
 			ProcessSelected(iExtractTot).Exports = Partners(iPartner).Exports
-			ProcessSelected(iExtractTot).Files = Partners(iPartner).Files
+			ProcessSelected(iExtractTot).Files = Partners(iPartner).MapFiles
 			ProcessSelected(iExtractTot).Columns = OpenMaps(iMapTable).Columns
 			ProcessSelected(iExtractTot).Clauses = OpenMaps(iMapTable).Clauses
 
@@ -1179,7 +1196,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 	sShortName As String,
 	sFormat As String,
 	sExport As String,
-	sFiles As String,
+	sSQLFiles As String,
 	iSelectType As Integer,
 	sTableName As String)
 '*************************************************
@@ -1206,17 +1223,11 @@ Sub SelectSQL (ByVal nConn As Integer,
 		((UCase$(sFormat) <> "SHP" And
 		UCase$(sFormat) <> "TAB" And
 		UCase$(sFormat) <> "BOTH") Or
-		sFiles = "") Then
+		sSQLFiles = "") Then
 		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
 		Exit Sub
 	End If
 
-	'-------------------------------------------------
-	' Setup the temporary and local table names
-	'-------------------------------------------------
-	Dim sTempName, sLocalPath As String
-	sTempName = sTableName + "_" + sUserID
-	sLocalPath = sDefaultPath + "\" + sShortName
 	Call MyPrint("Processing table = '" + sTableName + "' ...")
 
 	'-------------------------------------------------
@@ -1237,22 +1248,13 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Server nStmt1 Close
 
 	'-------------------------------------------------
-	' Close the temporary table if already/still open
-	' in the current MapInfo session
-	'-------------------------------------------------
-	If TableIsOpen(sTempName) Then
-		Call MyPrint("Closing the temporary table ...")
-		Close Table sTempName
-	End If
-
-	'-------------------------------------------------
 	' Loop through all the SQL clauses in the array
 	' and create a subset of the temporary table
 	' using each clause if the clause name is found
 	' in the partner table for this partner
 	'-------------------------------------------------
 	Dim i As Integer
-	Dim sNodeName, sLocalName as String
+	Dim sNodeName, sLocalTable as String
 	For i = 1 to UBound(SQLFiles)
 
 		'-------------------------------------------------
@@ -1261,14 +1263,22 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' to the next SQL clause.
 		'-------------------------------------------------
 		sNodeName = SQLFiles(i).Node
-		If Instr(1, Ucase$(sFiles), Ucase$(sNodeName)) > 0 then
-			sLocalName = SQLFiles(i).TableName
+		If Instr(1, Ucase$(sSQLFiles), Ucase$(sNodeName)) > 0 then
+			sLocalTable = SQLFiles(i).TableName
 		Else
 			Goto NextClause
 		End If
 
+		'-------------------------------------------------
+		' Setup the temporary and local table names
+		'-------------------------------------------------
+		Dim sSQLTable, sLocalPath, sTempTable As String
+		sSQLTable = sTableName + "_" + sUserID
+		sLocalPath = sDefaultPath + "\" + sShortName
+		sTempTable = Left$(sLocalTable, 28) + "_" + sShortName
+
 		Call MyPrint("")
-		Call MyPrint("Extracting '" + sLocalName + "' ...")
+		Call MyPrint("Extracting '" + sLocalTable + "' ...")
 
 		'-------------------------------------------------
 		' Set the SQL clause, excluding any
@@ -1296,7 +1306,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		Dim nStmt2 As Integer
 		Dim iRecTotal As Integer
 		Dim iRecStatus As Integer
-		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sTempName + " " + sSQLClause)
+		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause)
 		Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
 		Server nStmt2 Fetch Next
 
@@ -1328,18 +1338,18 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' Check if the temporary table is already/still open
 		' and close it if it is
 		'-------------------------------------------------
-		If TableIsOpen(sLocalName) Then
+		If TableIsOpen(sTempTable) Then
 			Call MyPrint("Closing temporary table ...")
-			Close Table sLocalName
+			Close Table sTempTable
 		End If
 
 		'-------------------------------------------------
 		' Check if the local table is already/still open
 		' and close it if it is
 		'-------------------------------------------------
-		If TableIsOpen(sLocalName + "_" + sShortName) Then
+		If TableIsOpen(sLocalTable) Then
 			Call MyPrint("Closing local table ...")
-			Close Table sLocalName + "_" + sShortName
+			Close Table sLocalTable
 		End If
 
 		'-------------------------------------------------
@@ -1347,17 +1357,17 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' temporary table (to check the record length)
 		'-------------------------------------------------
 		Dim sSQLStmt As String
-		sSQLStmt = "Select Top(0) " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " " + sSQLClause
+		sSQLStmt = "Select Top(0) " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
 
 		'-------------------------------------------------
-		' Link the temporary table as a local table
+		' Link the SQL table as a temporary table
 		'-------------------------------------------------
 		Call MyPrint("Linking dummy table ...")
 		Server nConn Link Table
 		sSQLStmt
 		Toolkit "ODBC"
-		Into sLocalName + "_" + sShortName
-		File sLocalPath + "\" + sLocalName
+		Into sTempTable
+		File sLocalPath + "\" + sLocalTable
 		Autokey Off
 		ReadOnly
 
@@ -1391,22 +1401,26 @@ Sub SelectSQL (ByVal nConn As Integer,
 		End If
 
 		'-------------------------------------------------
-		' Check if the maximum record length will be exceeded
+		' Calculate the maximum record length
 		'-------------------------------------------------
 		Dim iRowLength As Integer
 		iRowLength = GetRowLength(sTableAlias)
+
+		'-------------------------------------------------
+		' Drop the dummy table
+		'-------------------------------------------------
+		If TableIsOpen(sTableAlias) Then
+			Call MyPrint("Dropping dummy table ...")
+			Drop Table sTableAlias
+		End If
+
+		'-------------------------------------------------
+		' Check if the maximum record length will be exceeded
+		'-------------------------------------------------
 		If iRowLength > 4096 Then
 
 			Call MyPrint("Record length exceeds maximum of 4,096 bytes - selection cancelled.")
 			Note "Record length exceeds maximum of 4,096 bytes - selection cancelled."
-
-			'-------------------------------------------------
-			' Drop the local table
-			'-------------------------------------------------
-			If TableIsOpen(sTableAlias) Then
-				Call MyPrint("Dropping local table ...")
-				Drop Table sTableAlias
-			End If
 
 			Exit Sub
 
@@ -1438,41 +1452,25 @@ Sub SelectSQL (ByVal nConn As Integer,
 			Call MyPrint("Total data size exceeds maximum of 2 Gb - selection cancelled.")
 			Note "Total data size exceeds maximum of 2 Gb - selection cancelled."
 
-			'-------------------------------------------------
-			' Drop the local table
-			'-------------------------------------------------
-			If TableIsOpen(sTableAlias) Then
-				Call MyPrint("Dropping local table ...")
-				Drop Table sTableAlias
-			End If
-
 			Exit Sub
 
-		End If
-
-		'-------------------------------------------------
-		' Close the dummy table
-		'-------------------------------------------------
-		If TableIsOpen(sTableAlias) Then
-			Call MyPrint("Closing the dummy table ...")
-			Close Table sTableAlias
 		End If
 
 		'-------------------------------------------------
 		' Set up the SQL statement for extracting from
 		' the temporary table
 		'-------------------------------------------------
-		sSQLStmt = "Select " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sTempName + " " + sSQLClause
+		sSQLStmt = "Select " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
 
 		'-------------------------------------------------
-		' Link the temporary table as a local table
+		' Link the SQL table as a temporary table
 		'-------------------------------------------------
 		Call MyPrint("Linking temporary table ...")
 		Server nConn Link Table
 		sSQLStmt
 		Toolkit "ODBC"
-		Into sLocalName + "_" + sShortName
-		File sLocalPath + "\" + sLocalName
+		Into sTempTable
+		File sLocalPath + "\" + sLocalTable
 		Autokey Off
 		ReadOnly
 
@@ -1517,15 +1515,15 @@ Sub SelectSQL (ByVal nConn As Integer,
 		End If
 
 		'-------------------------------------------------
-		' Also export the table as a text file if required
+		' Also export the temporary table as a text file if required
 		'-------------------------------------------------
 		If UCase$(sExport) = "CSV" Then
 			Call MyPrint("Exporting as a CSV ...")
 
 			Set ProgressBars Off
 
-			Export sLocalName + "_" + sShortName
-				Into sLocalPath + "\" + sLocalName + ".csv"
+			Export sTableAlias
+				Into sLocalPath + "\" + sLocalTable + ".csv"
 				Type "ASCII"
 				Delimiter ","
 				CharSet "WindowsLatin1"
@@ -1539,8 +1537,8 @@ Sub SelectSQL (ByVal nConn As Integer,
 
 			Set ProgressBars Off
 
-			Export sLocalName + "_" + sShortName
-				Into sLocalPath + "\" + sLocalName + ".txt"
+			Export sTableAlias
+				Into sLocalPath + "\" + sLocalTable + ".txt"
 				Type "ASCII"
 				Delimiter ","
 				CharSet "WindowsLatin1"
@@ -1561,7 +1559,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 
 			'Call MyPrint("Log File Path = '" + sLogFilePath + "'")
 
-			Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
+			Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalTable)
 		End If
 
 		'-------------------------------------------------
@@ -1578,55 +1576,35 @@ Sub SelectSQL (ByVal nConn As Integer,
 			And bSpatialData = True Then
 
 				'-------------------------------------------------
-				' Check if the local table is open
+				' Check if the temporary table is open
 				'-------------------------------------------------
-				If TableIsOpen(sLocalName + "_" + sShortName) Then
+				If TableIsOpen(sTableAlias) Then
 
 					Call MyPrint("Setting symbology in table ...")
 
+					Set ProgressBars Off
+
 					'-------------------------------------------------
-					' If the local table contains a GRPRECISION
-					' column (which the symbology is based on)
+					' Turn on FastEdit to speed up the updates
 					'-------------------------------------------------
+					Set Table sTableAlias FastEdit On
 
-					If ColumnExists(sTableAlias, "GRPRECISION") Then
+					'-------------------------------------------------
+					' Set the symbology for the table before closing
+					'-------------------------------------------------
+					Call SetSymbology(sNodeName, sLocalTable, sShortName)
 
-						Set ProgressBars Off
+					Dim sCmd As String
+					sCmd = "Commit Table " + sTableAlias
+					Run Command (sCmd)
 
-						'-------------------------------------------------
-						' Add an index to the precision field to speed
-						' up the symbology setting
-						'-------------------------------------------------
-						'Create Index On sLocalName + "_" + sShortName(GRPRECISION)
+					'-------------------------------------------------
+					' Turn FastEdit off once updates are done
+					'-------------------------------------------------
+					Set Table sTableAlias FastEdit Off
 
-						'-------------------------------------------------
-						' Turn on FastEdit to speed up the updates
-						'-------------------------------------------------
-						Set Table sLocalName + "_" + sShortName FastEdit On
-
-						'-------------------------------------------------
-						' Set the symbology for the table before closing
-						'-------------------------------------------------
-						Call SetSymbology(sNodeName, sLocalName, sShortName)
-
-						Dim sCmd As String
-						sCmd = "Commit Table " + sLocalName + "_" + sShortName
-						Run Command (sCmd)
-
-						'-------------------------------------------------
-						' Turn FastEdit off once updates are done
-						'-------------------------------------------------
-						Set Table sLocalName + "_" + sShortName FastEdit Off
-
-						Call MyPrint("Closing the MapInfo table ...")
-						Close Table sLocalName + "_" + sShortName
-
-					Else
-
-						Call MyPrint("Table does not contain 'GRPRECISION' column - unable to set symbology.")
-						Note "Table does not contain 'GRPRECISION' column - unable to set symbology."
-
-					End If
+					Call MyPrint("Closing the MapInfo table ...")
+					Close Table sTableAlias
 
 				End If
 
@@ -1636,9 +1614,9 @@ Sub SelectSQL (ByVal nConn As Integer,
 			' If the partner doesn't require a MapInfo table
 			' check if the local table is open and drop it
 			'-------------------------------------------------
-			If TableIsOpen(sLocalName + "_" + sShortName) Then
+			If TableIsOpen(sTableAlias) Then
 				Call MyPrint("Dropping the MapInfo table ...")
-				Drop Table sLocalName + "_" + sShortName
+				Drop Table sTableAlias
 			End If
 		End If
 
@@ -1670,7 +1648,7 @@ ErrorTrap:
 
 End Sub
 
-Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String)
+Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As String)
 '***************************************************************
 '* Retrieve the symbology styles and clauses from the config file
 '* which is a XML document
@@ -1687,6 +1665,12 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 	Dim hXMLSymbolNode As MIXmlNode
 
 	OnError Goto GetSymbologyError
+
+	'-------------------------------------------------
+	' Setup the temporary and local table names
+	'-------------------------------------------------
+	Dim sTempTable As String
+	sTempTable = Left$(sLocalTable, 28) + "_" + sShortName
 
 	'-------------------------------------------------
 	' Create a document handle
@@ -1762,6 +1746,9 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 						'-------------------------------------------------
 						Dim sClause As String
 						sClause = GetSingleNodeValue(hXMLSymbolNode, "Clause")
+						If sClause <> "" Then
+							sClause = " And " & sClause
+						End If
 
 						'-------------------------------------------------
 						' Get the type of object (i.e. Point or Region)
@@ -1774,7 +1761,7 @@ Sub SetSymbology(sNodeName as String, sLocalName As String, sShortName As String
 						' matching the required SQL clause
 						'-------------------------------------------------
 						Dim sCmd As String
-						sCmd = "Select * From " + sLocalName + "_" + sShortName + " Where Str$(obj) = """ + sObject + """ And " + sClause + " Into NewStyle NoSelect"
+						sCmd = "Select * From " + sTempTable + " Where Str$(obj) = """ + sObject + """ " + sClause + " Into NewStyle NoSelect"
 						Run Command (sCmd)
 
 						'-------------------------------------------------
@@ -1884,7 +1871,7 @@ Sub SelectMaps (sPartnerName As String,
 	sShortName As String,
 	sFormat As String,
 	sExport As String,
-	sFiles As String,
+	sMapFiles As String,
 	sNodeName as String,
 	sTableName As String,
 	sMapColumns As String,
@@ -1899,19 +1886,13 @@ Sub SelectMaps (sPartnerName As String,
 	OnError Goto ErrorTrap
 
 	'-------------------------------------------------
-	' Setup the temporary and local table names
-	'-------------------------------------------------
-	Dim sTempName As String
-	sTempName = sTableName + "_" + sUserID
-
-	'-------------------------------------------------
 	' Check the partner requires something
 	'-------------------------------------------------
 	If UCase$(sExport) = "" And
 		((UCase$(sFormat) <> "SHP" And
 		UCase$(sFormat) <> "TAB" And
 		UCase$(sFormat) <> "BOTH") Or
-		sFiles = "") Then
+		sMapFiles = "") Then
 		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
 		Exit Sub
 	End If
@@ -1920,7 +1901,7 @@ Sub SelectMaps (sPartnerName As String,
 	' If this Map table is found in the partner
 	' table record then process it, otherwise skip it
 	'-------------------------------------------------
-	If Instr(1, Ucase$(sFiles), Ucase$(sNodeName)) = 0 then
+	If Instr(1, Ucase$(sMapFiles), Ucase$(sNodeName)) = 0 then
 		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
 		Exit Sub
 	End If
@@ -1930,17 +1911,18 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	' Setup the temporary and local table names
 	'-------------------------------------------------
-	Dim sLocalPath, sLocalName As String
+	Dim sLocalPath, sLocalTable, sTempTable As String
 	sLocalPath = sDefaultPath + "\" + sShortName
-	sLocalName = sTableName
+	sLocalTable = sTableName
+	sTempTable = Left$(sTableName, 28) + "_" + sShortName
 
 	'-------------------------------------------------
 	' Check if the local table is already/still open
 	' and close it if it is
 	'-------------------------------------------------
-	If TableIsOpen(sLocalName + "_" + sShortName) Then
-		Call MyPrint("Closing local table ...")
-		Close Table sLocalName + "_" + sShortName
+	If TableIsOpen(sTempTable) Then
+		Call MyPrint("Closing temporary table ...")
+		Close Table sTempTable
 	End If
 
 	'-------------------------------------------------
@@ -1956,7 +1938,7 @@ Sub SelectMaps (sPartnerName As String,
 	Else
 		sWhereClause = " And " + sMapClauses
 	End If
-	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sWhereClause + " Into " + sLocalName + "_" + sShortName + " NoSelect"
+	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sWhereClause + " Into " + sTempTable + " NoSelect"
 	Run Command (sCmd)
 
 	'-------------------------------------------------
@@ -1964,7 +1946,7 @@ Sub SelectMaps (sPartnerName As String,
 	' been selected
 	'-------------------------------------------------
 	Dim iRecTotal As Integer
-	iRecTotal = TableInfo(sLocalName + "_" + sShortName, TAB_INFO_NROWS)
+	iRecTotal = TableInfo(sTempTable, TAB_INFO_NROWS)
 
 	'-------------------------------------------------
 	' Check if the maximum number of records will be
@@ -1972,6 +1954,10 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	If iRecTotal > iRecMax Then
 		Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
+		If TableIsOpen(sTempTable) Then
+			Call MyPrint("Closing the MapInfo table ...")
+			Close Table sTempTable
+		End If
 		Exit Sub
 	End If
 
@@ -1980,6 +1966,10 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	If iRecTotal = 0 Then
 		Call MyPrint("No records found - extract skipped.")
+		If TableIsOpen(sTempTable) Then
+			Call MyPrint("Closing the MapInfo table ...")
+			Close Table sTempTable
+		End If
 		Exit Sub
 	End If
 
@@ -1988,16 +1978,16 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	' Save the local table
 	'-------------------------------------------------
-	Call MyPrint("Saving local table ...")
-	sCmd = "Commit Table " + sLocalName + "_" + sShortName + " As " + Chr$(34) + sLocalPath + "\" + sLocalName + ".tab" + Chr$(34) + " TYPE NATIVE Charset " + Chr$(34) + "WindowsLatin1" + Chr$(34)
+	Call MyPrint("Saving temporary table ...")
+	sCmd = "Commit Table " + sTempTable + " As " + Chr$(34) + sLocalPath + "\" + sLocalTable + ".tab" + Chr$(34) + " TYPE NATIVE Charset " + Chr$(34) + "WindowsLatin1" + Chr$(34)
 	Run Command (sCmd)
 
 	'-------------------------------------------------
 	' Close the local table and re-open it (as it seems
 	' to get locked somehow and won't drop)
 	'-------------------------------------------------
-	Close Table sLocalName + "_" + sShortName
-	sCmd = "Open Table " + Chr$(34) + sLocalPath + "\" + sLocalName + ".tab" + Chr$(34) + " As " + sLocalName + "_" + sShortName
+	Close Table sTempTable
+	sCmd = "Open Table " + Chr$(34) + sLocalPath + "\" + sLocalTable + ".tab" + Chr$(34) + " As " + sTempTable
 	Run Command (sCmd)
 
 	'-------------------------------------------------
@@ -2008,8 +1998,8 @@ Sub SelectMaps (sPartnerName As String,
 
 			Set ProgressBars Off
 
-			Export sLocalName + "_" + sShortName
-				Into sLocalPath + "\" + sLocalName + ".csv"
+			Export sTempTable
+				Into sLocalPath + "\" + sLocalTable + ".csv"
 				Type "ASCII"
 				Delimiter ","
 				CharSet "WindowsLatin1"
@@ -2023,8 +2013,8 @@ Sub SelectMaps (sPartnerName As String,
 
 			Set ProgressBars Off
 
-			Export sLocalName + "_" + sShortName
-				Into sLocalPath + "\" + sLocalName + ".txt"
+			Export sTempTable
+				Into sLocalPath + "\" + sLocalTable + ".txt"
 				Type "ASCII"
 				Delimiter ","
 				CharSet "WindowsLatin1"
@@ -2043,7 +2033,7 @@ Sub SelectMaps (sPartnerName As String,
 		sLogFilePath = PathToDirectory$(sLogFileName)
 		sLogFileShp = "TabToShp" + "_" + sUserID
 
-		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalName)
+		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalTable)
 	End If
 
 	'-------------------------------------------------
@@ -2053,18 +2043,18 @@ Sub SelectMaps (sPartnerName As String,
 		'-------------------------------------------------
 		' Check if the local table is open and close it
 		'-------------------------------------------------
-		If TableIsOpen(sLocalName + "_" + sShortName) Then
+		If TableIsOpen(sTempTable) Then
 			Call MyPrint("Closing the MapInfo table ...")
-			Close Table sLocalName + "_" + sShortName
+			Close Table sTempTable
 		End If
 	Else
 		'-------------------------------------------------
 		' If the partner doesn't require a MapInfo table
 		' drop (delete) the table
 		'-------------------------------------------------
-		If TableIsOpen(sLocalName + "_" + sShortName) Then
+		If TableIsOpen(sTempTable) Then
 			Call MyPrint("Dropping the MapInfo table ...")
-			Drop Table sLocalName + "_" + sShortName
+			Drop Table sTempTable
 		End If
 	End If
 
