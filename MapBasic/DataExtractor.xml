@@ -96,11 +96,17 @@ used by the MapBasic tool to select and export data for partners.
 	<value>Exportformat</value>
   </ExportColumn>
 
-  <!-- The name of the column in the partner GIS layer indicating which files should be
+  <!-- The name of the column in the partner GIS layer indicating which SQL files should be
        created for each partner -->
-  <FilesColumn>
-	<value>Files</value>
-  </FilesColumn>
+  <SQLFilesColumn>
+	<value>SQLFiles</value>
+  </SQLFilesColumn>
+
+  <!-- The name of the column in the partner GIS layer indicating which Map files should be
+       created for each partner -->
+  <MapFilesColumn>
+	<value>MapFiles</value>
+  </MapFilesColumn>
 
   <!-- The name of the column in the partner GIS layer indicating which survey tags, if any
        should be included in the export -->
@@ -124,7 +130,7 @@ used by the MapBasic tool to select and export data for partners.
 	<value>10000000</value>
   </RecMax>
 
-  <!-- The default value for zipping the extract files -->
+  <!-- The default value for zipping the extract files. Leave blank to hide option in dialog. -->
   <DefaultZip>
 	<value>No</value>
   </DefaultZip>
@@ -134,7 +140,7 @@ used by the MapBasic tool to select and export data for partners.
 	<value>R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
   </ConfidentialClause>
 
-  <!-- The default value for extracting confidential surveys -->
+  <!-- The default value for extracting confidential surveys. Leave blank to hide option in dialog. -->
   <DefaultConfidential>
 	<value>No</value>
   </DefaultConfidential>
