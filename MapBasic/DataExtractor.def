@@ -156,6 +156,8 @@ Declare Sub SetUTDirectory
 	(ByVal sPath as string)
 Declare Sub AmendVersion
 	(ByVal sFileName As String)
+Declare Sub AmendMappingFile
+	(ByVal sFileName As String)
 Declare Sub TranslateToShapefile
 	(sUTPath As String,
 	sUTCommand As String,

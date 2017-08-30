@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.13
+'* DataExtractor v1.5.14
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,12 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - May 2017
+'* Last revised:	Andy Foy - August 2017
+'*
+'* *****************  Version 1.5.14  ***************
+'* Author: Andy Foy		Date: 09/08/2017
+'* A. Force universal translator to generate 2D instead
+'*	   of 3D shapefiles.
 '*
 '* *****************  Version 1.5.13  ***************
 '* Author: Andy Foy		Date: 01/05/2017
@@ -122,7 +127,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.13"
+	sVersion = "1.5.14"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu

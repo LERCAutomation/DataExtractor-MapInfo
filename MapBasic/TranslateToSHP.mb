@@ -20,14 +20,19 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* TranslateToSHP v1.41
+'* TranslateToSHP v1.43
 '*
 '* Contains functions to translate MapInfo .tab files into
 '* ESRI .shp files.
 '*
 '*
 '* Created:				Andy Foy - February 2013
-'* Last revised:		Andy Foy - July 2016
+'* Last revised:		Andy Foy - August 2017
+'*
+'* *****************  Version 1.43  *****************
+'* Author: Andy Foy		Date: 09/08/2017
+'* A. Amend mapping file to generate 2D instead of 3D
+'*	  shapefiles.
 '*
 '* *****************  Version 1.42  *****************
 '* Author: Andy Foy		Date: 13/07/2016
@@ -152,6 +157,9 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 		" --_BASENAME " + sLocalName +
 		" --_FULLBASENAME " + sLocalName
 
+	Call MyPrint("Amending Mapping file ...")
+	Call AmendMappingFile(sMappingFile)
+
 	'-------------------------------------------------
 	' Check to see if the Mapping file was created
 	' before running the translation
@@ -246,6 +254,75 @@ Dim iTemp As Integer
 			Else
 				iTemp = iTemp + 1
 				aTemp(iTemp) = sBuf
+			End If
+		End If
+		Line Input #1, sBuf
+	Loop
+
+	'-------------------------------------------------
+	' Close the input file
+	'-------------------------------------------------
+	Close File #1
+
+	'-------------------------------------------------
+	' Open the file for output
+	'-------------------------------------------------
+	Open File sFileName For Output As #2
+
+	'-------------------------------------------------
+	' Write the array contents to the output file
+	'-------------------------------------------------
+	Dim iTemp2 As Integer
+	For iTemp2 = 1 to iTemp
+		Print #2, aTemp(iTemp2)
+	Next
+
+	'-------------------------------------------------
+	' Close the output file
+	'-------------------------------------------------
+	Close File #2
+
+End Sub
+
+Sub AmendMappingFile(ByVal sFileName As String)
+'***************************************************************
+'* Amend the mapping file so that the Universal Translator
+'* will generate a 2D shapefile not a 3D shapefile.
+'***************************************************************
+
+Dim sBuf As String
+Dim aTemp(29999) As String
+Dim iTemp As Integer
+
+	'-------------------------------------------------
+	' Open the file for input
+	'-------------------------------------------------
+	Open File sFileName For Input As #1
+
+	'-------------------------------------------------
+	' Store the input file line by line in an array
+	'-------------------------------------------------
+	Line Input #1, sBuf
+	iTemp = 0
+	Do Until EOF(1)
+		'-------------------------------------------------
+		' Replace the output types (when found)
+		'-------------------------------------------------
+		If Instr(1, Lcase$(sBuf), "shape_pointz") > 0 then
+			iTemp = iTemp + 1
+			aTemp(iTemp) = StringReplace(sBuf, "shape_pointz", "shape_point ")
+		Else
+			If Instr(1, Lcase$(sBuf), "shape_polylinez") > 0 then
+				iTemp = iTemp + 1
+				aTemp(iTemp) = StringReplace(sBuf, "shape_polylinez", "shape_polyline ")
+			Else
+				If Instr(1, Lcase$(sBuf), "shape_polygonz") > 0 then
+					iTemp = iTemp + 1
+					aTemp(iTemp) = StringReplace(sBuf, "shape_polygonz", "shape_polygon ")
+				Else
+					iTemp = iTemp + 1
+					aTemp(iTemp) = sBuf
+				End If
 			End If
 		End If
 		Line Input #1, sBuf
