@@ -2,7 +2,7 @@
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
 '* Copyright © 2013, 2015 GiGL
-'* Copyright © 2015 - 2016 TVERC & GiGL
+'* Copyright © 2015 - 2017 TVERC & GiGL
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.14
+'* DataExtractor v1.5.15
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,12 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - August 2017
+'* Last revised:	Andy Foy - November 2017
+'*
+'* *****************  Version 1.5.15  ***************
+'* Author: Andy Foy		Date: 16/11/2017
+'* A. Improve debug logging.
+'* B. Remove CRs, LFs and tabs from where clauses.
 '*
 '* *****************  Version 1.5.14  ***************
 '* Author: Andy Foy		Date: 09/08/2017
@@ -127,7 +132,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.14"
+	sVersion = "1.5.15"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -386,6 +391,11 @@ Sub GetDefaultValues
 
 						' SQL clause used to retrieve the required rows from the temporary SQL table
 						SQLFiles(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clauses")
+						
+						' Remove CR, LF and Tab chars
+						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(10), "")
+						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(13), "")
+						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(9), "")
 
 						'-------------------------------------------------
 						' Get a handle on the next attribute in the node list
@@ -431,6 +441,11 @@ Sub GetDefaultValues
 
 						' SQL clause used to retrieve the required rows from the loaded map table
 						AllMaps(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clause")
+
+						' Remove CR, LF and Tab chars
+						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(10), "")
+						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(13), "")
+						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(9), "")
 
 						'-------------------------------------------------
 						' Get a handle on the next attribute in the node list
@@ -1253,6 +1268,38 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Server nStmt1 Close
 
 	'-------------------------------------------------
+	' Setup the temporary SQL table name
+	'-------------------------------------------------
+	Dim sSQLTable As String
+	sSQLTable = sTableName + "_" + sUserID
+
+	'-------------------------------------------------
+	' Count the number of records that have been
+	' selected
+	'-------------------------------------------------
+	Dim nStmt2 As Integer
+	Dim iRecTotal As Integer
+	Dim iRecStatus As Integer
+	nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sSQLTable)
+	Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
+	Server nStmt2 Fetch Next
+
+	'-------------------------------------------------
+	' Check if any records were extracted
+	'-------------------------------------------------
+	If iRecTotal = 0 Then
+		Call MyPrint("No records selected - skipping extracts.")
+		Goto CleanUp
+	End If
+
+	Call MyPrint("" + FormatNumber$(iRecTotal) + " records selected.")
+
+	'-------------------------------------------------
+	' Close the results
+	'-------------------------------------------------
+	Server nStmt2 Close
+
+	'-------------------------------------------------
 	' Loop through all the SQL clauses in the array
 	' and create a subset of the temporary table
 	' using each clause if the clause name is found
@@ -1277,8 +1324,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		' Setup the temporary and local table names
 		'-------------------------------------------------
-		Dim sSQLTable, sLocalPath, sTempTable As String
-		sSQLTable = sTableName + "_" + sUserID
+		Dim sLocalPath, sTempTable As String
 		sLocalPath = sDefaultPath + "\" + sShortName
 		sTempTable = Left$(sLocalTable, 28) + "_" + sShortName
 
@@ -1294,23 +1340,27 @@ Sub SelectSQL (ByVal nConn As Integer,
 			If bConfidentialSurveys = True Or sConfidentialClause = "" Then
 				sSQLClause = ""
 			Else
-				sSQLClause = "Where " & sConfidentialClause
+				sSQLClause = sConfidentialClause
 			End If
 		Else
 			If bConfidentialSurveys = True Or sConfidentialClause = "" Then
-				sSQLClause = "Where " & SQLFiles(i).Clauses
+				sSQLClause = SQLFiles(i).Clauses
 			Else
-				sSQLClause = "Where " & SQLFiles(i).Clauses & " And " & sConfidentialClause
+				sSQLClause = SQLFiles(i).Clauses & " And " & sConfidentialClause
 			End If
+		End If
+
+	    If sSQLClause = "" Then
+	        Call MyPrint("No where clause was used")
+       	Else
+			Call MyPrint("Where clause is ... " + sSQLClause)
+			sSQLClause = "Where " & sSQLClause
 		End If
 
 		'-------------------------------------------------
 		' Count the number of records that have been
 		' selected in the output temporary table
 		'-------------------------------------------------
-		Dim nStmt2 As Integer
-		Dim iRecTotal As Integer
-		Dim iRecStatus As Integer
 		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause)
 		Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
 		Server nStmt2 Fetch Next
@@ -1635,6 +1685,7 @@ NextClause:
 	' Execute a SQL Server stored procedure to delete
 	' the temporary SQL table
 	'-------------------------------------------------
+CleanUp:
 	Dim nStmt3 As Integer
 	nStmt3 = Server_Execute(nConn, "EXECUTE dbo.AFClearSppSubset '" + sDefaultSchema
 	+ "', '" + sTableName + "', '" + sUserID + "'")
@@ -2098,7 +2149,7 @@ Sub AboutBox
 		Title "Created by Andy Foy Consulting."
 		Position 10,60
 	Control StaticText
-		Title "Copyright© 2012-2013 GiGL, 2015 - 2016 TVERC & GiGL."
+		Title "Copyright© 2012-2013 GiGL, 2015 - 2017 TVERC & GiGL."
 		Position 10,70
 	Control OKButton
 		Position 185,95
