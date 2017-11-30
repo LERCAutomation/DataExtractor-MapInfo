@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.15
+'* DataExtractor v1.5.16
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -30,6 +30,11 @@
 '*
 '* Created:			Andy Foy - November 2012
 '* Last revised:	Andy Foy - November 2017
+'*
+'* *****************  Version 1.5.16  ***************
+'* Author: Andy Foy		Date: 30/11/2017
+'* A. Truncate user ID if it means the temporary SQL
+'*    will be too long for the MapCatalog (> 32 chars).
 '*
 '* *****************  Version 1.5.15  ***************
 '* Author: Andy Foy		Date: 16/11/2017
@@ -132,7 +137,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.15"
+	sVersion = "1.5.16"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1231,10 +1236,16 @@ Sub SelectSQL (ByVal nConn As Integer,
 	'-------------------------------------------------
 	' Get the current user ID
 	'-------------------------------------------------
-	Dim sUserID As String
-	sUserID = GetUserID()
-	sUserID = StringReplace(sUserID, " ", "_")
-	sUserID = StringReplace(sUserID, ".", "_")
+	Dim sUser As String
+	sUser = sUserID
+
+	'-------------------------------------------------
+	' Truncate the user ID if it will make the
+	' temporary SQL table name too long
+	'-------------------------------------------------
+	If Len(sTableName + "_" + sUser) > 32 Then
+		sUser = Left$(sUser, Maximum(31 - Len(sTableName), 0))
+	End If
 
 	'-------------------------------------------------
 	' Check the partner requires something
@@ -1259,7 +1270,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Call MyPrint("Executing spatial selection ...")
 	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
-	 + sPartnerName + "', '" + sTagsColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUserID + "'")
+	 + sPartnerName + "', '" + sTagsColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "'")
 	Call MyPrint("Spatial selection complete.")
 
 	'-------------------------------------------------
@@ -1271,7 +1282,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 	' Setup the temporary SQL table name
 	'-------------------------------------------------
 	Dim sSQLTable As String
-	sSQLTable = sTableName + "_" + sUserID
+	sSQLTable = sTableName + "_" + sUser
 
 	'-------------------------------------------------
 	' Count the number of records that have been
@@ -1688,7 +1699,7 @@ NextClause:
 CleanUp:
 	Dim nStmt3 As Integer
 	nStmt3 = Server_Execute(nConn, "EXECUTE dbo.AFClearSppSubset '" + sDefaultSchema
-	+ "', '" + sTableName + "', '" + sUserID + "'")
+	+ "', '" + sTableName + "', '" + sUser + "'")
 
 	'-------------------------------------------------
 	' Close the results
