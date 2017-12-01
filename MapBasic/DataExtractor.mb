@@ -20,7 +20,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.16
+'* DataExtractor
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +29,13 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - November 2017
+'* Last revised:	Andy Foy - December 2017
+'*
+'* *****************  Version 1.5.17  ***************
+'* Author: Andy Foy		Date: 01/12/2017
+'* A. Increase max partners to 999 and max processes
+'*    to 32,767 (the array limit).
+'* B. Truncate temporary table names to 31 chars.
 '*
 '* *****************  Version 1.5.16  ***************
 '* Author: Andy Foy		Date: 30/11/2017
@@ -137,7 +143,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.16"
+	sVersion = "1.5.17"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -703,8 +709,8 @@ Sub DialogSetup
 		'-------------------------------------------------
 		Dim i as integer
 		i = 0
-		Redim PartnersList(199)
-		Redim Partners(199)
+		Redim PartnersList(999)
+		Redim Partners(999)
 		While i < iPartners
 	
 			i = i + 1
@@ -714,8 +720,8 @@ Sub DialogSetup
 			'-------------------------------------------------
 			PartnersList(i) = PartnerList.Col1
 			Partners(i).Name = PartnerList.Col1
-			Partners(i).Short = LTrim$(RTrim$(PartnerList.Col2))
-			Partners(i).Notes = LTrim$(RTrim$(PartnerList.Col3))
+			Partners(i).Short = LTrim$(RTrim$(Str$(PartnerList.Col2)))
+			Partners(i).Notes = LTrim$(RTrim$(Str$(PartnerList.Col3)))
 			Partners(i).Formats = PartnerList.Col4
 			Partners(i).Exports = PartnerList.Col5
 			Partners(i).SQLFiles = PartnerList.Col6
@@ -957,6 +963,7 @@ Sub CheckSelection
 	'-------------------------------------------------
 	' Count the number of extracts to run
 	'-------------------------------------------------
+	'Redim ProcessSelected(32767)
 	Do While iPartner > 0
 		Do While iSQLTable > 0
 			'-------------------------------------------------
@@ -1003,6 +1010,8 @@ Sub CheckSelection
 			'-------------------------------------------------
 			iMapTable = ReadControlValue(3)
 		Loop
+
+		'Redim ProcessSelected(iExtractTot)
 
 		'-------------------------------------------------
 		' Read the next partner selected in the list
@@ -1337,7 +1346,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		Dim sLocalPath, sTempTable As String
 		sLocalPath = sDefaultPath + "\" + sShortName
-		sTempTable = Left$(sLocalTable, 28) + "_" + sShortName
+		sTempTable = Left$(sLocalTable + "_" + sShortName, 31)
 
 		Call MyPrint("")
 		Call MyPrint("Extracting '" + sLocalTable + "' ...")
@@ -1737,7 +1746,7 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 	' Setup the temporary and local table names
 	'-------------------------------------------------
 	Dim sTempTable As String
-	sTempTable = Left$(sLocalTable, 28) + "_" + sShortName
+	sTempTable = Left$(sLocalTable + "_" + sShortName, 31)
 
 	'-------------------------------------------------
 	' Create a document handle
@@ -1981,7 +1990,7 @@ Sub SelectMaps (sPartnerName As String,
 	Dim sLocalPath, sLocalTable, sTempTable As String
 	sLocalPath = sDefaultPath + "\" + sShortName
 	sLocalTable = sTableName
-	sTempTable = Left$(sTableName, 28) + "_" + sShortName
+	sTempTable = Left$(sTableName + "_" + sShortName, 31)
 
 	'-------------------------------------------------
 	' Check if the local table is already/still open
@@ -2005,7 +2014,7 @@ Sub SelectMaps (sPartnerName As String,
 	Else
 		sWhereClause = " And " + sMapClauses
 	End If
-	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where " + sPartnerColumn + " = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sWhereClause + " Into " + sTempTable + " NoSelect"
+	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sWhereClause + " Into " + sTempTable + " NoSelect"
 	Run Command (sCmd)
 
 	'-------------------------------------------------

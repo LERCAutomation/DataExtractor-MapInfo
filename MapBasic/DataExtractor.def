@@ -339,8 +339,8 @@ Global sEastingCol As String
 Global sNorthingCol As String
 Global sPrecisionCol As String
 
-Global Partners(199) As PartnerDetails
-Global PartnersList(199) As String
+Global Partners(999) As PartnerDetails
+Global PartnersList(999) As String
 
 Global SQLTablesList(99) As String
 Global OpenMapsList(99) As String
@@ -349,7 +349,7 @@ Global SQLFiles(99) As FileDetails
 Global AllMaps(99) As MapDetails
 Global OpenMaps(99) As MapDetails
 
-Global ProcessSelected(999) As ProcessDetails
+Global ProcessSelected(32767) As ProcessDetails
 
 Global iExtractTot As Integer
 Global iExtractCnt As Integer
