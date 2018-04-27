@@ -29,7 +29,16 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - December 2017
+'* Last revised:	Andy Foy - April 2018
+'*
+'* *****************  Version 1.5.19  ***************
+'* Author: Andy Foy		Date: 27/04/2018
+'* A. Reset list value positions before processing to
+'*    to avoid entries being missed.
+'*
+'* *****************  Version 1.5.18  ***************
+'* Author: Andy Foy		Date: 28/03/2018
+'* A. Reduce maximum process array size to avoid crash.
 '*
 '* *****************  Version 1.5.17  ***************
 '* Author: Andy Foy		Date: 01/12/2017
@@ -143,7 +152,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.17"
+	sVersion = "1.5.19"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -961,9 +970,34 @@ Sub CheckSelection
 	sLastShortName = ""
 
 	'-------------------------------------------------
+	' Reset the lists
+	'-------------------------------------------------
+	iPartner = ReadControlValue(1)
+	Do Until iPartner = 0
+	   iPartner = ReadControlValue(1)
+	Loop
+
+	iSQLTable = ReadControlValue(2)
+	Do Until iSQLTable = 0
+	   iSQLTable = ReadControlValue(2)
+	Loop
+
+	iMapTable = ReadControlValue(3)
+	Do Until iMapTable = 0
+	   iMapTable = ReadControlValue(3)
+	Loop
+
+	'-------------------------------------------------
+	' Read the first list values
+	'-------------------------------------------------
+	iPartner = ReadControlValue(1)
+	iSQLTable = ReadControlValue(2)
+	iMapTable = ReadControlValue(3)
+
+	'-------------------------------------------------
 	' Count the number of extracts to run
 	'-------------------------------------------------
-	'Redim ProcessSelected(32767)
+	Redim ProcessSelected(25000)
 	Do While iPartner > 0
 		Do While iSQLTable > 0
 			'-------------------------------------------------

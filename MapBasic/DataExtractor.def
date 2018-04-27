@@ -349,7 +349,7 @@ Global SQLFiles(99) As FileDetails
 Global AllMaps(99) As MapDetails
 Global OpenMaps(99) As MapDetails
 
-Global ProcessSelected(32767) As ProcessDetails
+Global ProcessSelected(25000) As ProcessDetails
 
 Global iExtractTot As Integer
 Global iExtractCnt As Integer
