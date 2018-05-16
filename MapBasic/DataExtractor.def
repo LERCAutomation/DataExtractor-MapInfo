@@ -2,7 +2,7 @@
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
 '* Copyright © 2012-2013, 2015-2017 Greenspace Information for Greater London (GiGL)
-'* Copyright © 2015-2017 Andy Foy Consulting
+'* Copyright © 2015-2018 Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -165,6 +165,11 @@ Declare Sub TranslateToShapefile
 	sLocalPath As String,
 	sLocalName As String,
 	sShortName As String)
+Declare Sub Wait
+	(ByVal iSeconds as Integer)
+
+Declare Sub Sleep Lib "kernel32.dll" Alias "Sleep" 
+	(ByVal dwMilliseconds As Integer)
 
 Declare Sub MIXmlDocumentDestroy Lib MIXML_LIB_NAME
 	Alias "MIXmlDocumentDestroy" (
@@ -363,3 +368,5 @@ Global bClearLog As Logical
 Global iSelectType As Integer
 
 Global sLastShortName As String
+
+Global iFileErrorCount as Integer

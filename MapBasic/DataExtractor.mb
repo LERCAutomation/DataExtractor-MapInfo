@@ -29,7 +29,12 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - April 2018
+'* Last revised:	Andy Foy - May 2018
+'*
+'* *****************  Version 1.5.20  ***************
+'* Author: Andy Foy		Date: 03/05/2018
+'* A. Try to avoid file locking issues in Windows 10.
+'* B. Avoid loop after error processing a partner.
 '*
 '* *****************  Version 1.5.19  ***************
 '* Author: Andy Foy		Date: 27/04/2018
@@ -152,7 +157,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.19"
+	sVersion = "1.5.20"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1086,6 +1091,11 @@ Sub CheckSelection
 		End If
 	End If
 
+	'-------------------------------------------------
+	' Reset the file access error counter
+	'-------------------------------------------------
+	iFileErrorCount = 0
+
 	Call MyPrint("----------------------------------------------------------------------")
 	Call MyPrint("Process started!")
 	Call MyPrint("----------------------------------------------------------------------")
@@ -1133,12 +1143,21 @@ Sub CheckSelection
 	'-------------------------------------------------
 	Call PrintLogFile
 
+	'-------------------------------------------------
+	' Report the number of file access errors
+	'-------------------------------------------------
+	If iFileErrorCount > 0 then
+		Note "Note: There were " & iFileErrorCount & " file access delays during this process."
+	End If
+
 End Sub
 
 Sub ProcessExtracts
 '***************************************************************
 '* Process each combination of table and partner
 '***************************************************************
+
+	OnError Goto ErrorTrap
 
 	Dim sNodeName, sTableName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses As String
 	sNodeName = ProcessSelected(iExtractCnt).Node
@@ -1257,6 +1276,15 @@ Sub ProcessExtracts
 		ProgressBar = -1
 	End If
 
+ExitSub:
+	Exit Sub
+	
+ErrorTrap:
+	'-------------------------------------------------
+	' Halt processing
+	'-------------------------------------------------
+	ProgressBar = -1
+
 End Sub
 
 Sub SelectSQL (ByVal nConn As Integer,
@@ -1273,6 +1301,12 @@ Sub SelectSQL (ByVal nConn As Integer,
 '* intersect with the boundaries where the
 '* partner equals the value passed in the call.
 '*************************************************
+
+	Dim iWaitCount As Integer
+	iWaitCount = 0
+
+	Dim ErrorType As String
+	ErrorType = ""
 
 	OnError Goto ErrorTrap
 
@@ -1311,9 +1345,11 @@ Sub SelectSQL (ByVal nConn As Integer,
 	'-------------------------------------------------
 	Dim nStmt1 As Integer
 	Call MyPrint("Executing spatial selection ...")
+
 	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
 	 + sPartnerName + "', '" + sTagsColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "'")
+
 	Call MyPrint("Spatial selection complete.")
 
 	'-------------------------------------------------
@@ -1471,6 +1507,9 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		' Link the SQL table as a temporary table
 		'-------------------------------------------------
+LinkTemp:
+		OnError Goto TempError
+		
 		Call MyPrint("Linking dummy table ...")
 		Server nConn Link Table
 		sSQLStmt
@@ -1479,6 +1518,8 @@ Sub SelectSQL (ByVal nConn As Integer,
 		File sLocalPath + "\" + sLocalTable
 		Autokey Off
 		ReadOnly
+
+		OnError Goto ErrorTrap
 
 		'-------------------------------------------------
 		' Get the table name alias of the new table
@@ -1574,6 +1615,9 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		' Link the SQL table as a temporary table
 		'-------------------------------------------------
+LinkTable:
+		OnError Goto LinkError
+		
 		Call MyPrint("Linking temporary table ...")
 		Server nConn Link Table
 		sSQLStmt
@@ -1582,6 +1626,8 @@ Sub SelectSQL (ByVal nConn As Integer,
 		File sLocalPath + "\" + sLocalTable
 		Autokey Off
 		ReadOnly
+
+		OnError Goto ErrorTrap
 
 		'-------------------------------------------------
 		' Get the table name alias of the new table
@@ -1626,6 +1672,9 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		' Also export the temporary table as a text file if required
 		'-------------------------------------------------
+ExportTable:
+		OnError Goto ExportError
+		
 		If UCase$(sExport) = "CSV" Then
 			Call MyPrint("Exporting as a CSV ...")
 
@@ -1657,6 +1706,8 @@ Sub SelectSQL (ByVal nConn As Integer,
 			Set ProgressBars On
 
 		End If
+
+		OnError Goto ErrorTrap
 
 		'-------------------------------------------------
 		' Translate the table to ESRI shapefile if required
@@ -1749,12 +1800,61 @@ CleanUp:
 	'-------------------------------------------------
 	Server nStmt3 Close
 
+ExitSub:
+
+	If iWaitCount > 0 Then
+		iFileErrorCount = iFileErrorCount + 1
+	End If
+
 	Exit Sub
-	
+
+TempError:
+	ErrorType = "Temp"	
+	Goto ErrorTrap
+
+LinkError:
+	ErrorType = "Link"	
+	Goto ErrorTrap
+
+ExportError:
+	ErrorType = "Export"	
+	Goto ErrorTrap
+
 ErrorTrap:
-	Note str$(Err()) + ": " + Error$()
-	Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
-	Exit Sub
+
+	'-------------------------------------------------
+	' Exit if we've already waited 20 seconds
+	'-------------------------------------------------
+	If iWaitCount > 20 Then
+		Note str$(Err()) + ": " + Error$()
+		Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
+		Goto ExitSub
+	End If
+
+	'-------------------------------------------------
+	' If this is a file access error then wait 
+	' for 5 seconds and then try again
+	'-------------------------------------------------
+	If Left$(Error$(), 18) = "Cannot access file" Then
+		Call Wait(5)
+		iWaitCount = iWaitCount + 5
+		
+		Do Case ErrorType
+			Case "Temp"
+				Call MyPrint("Error: " + str$(Err()) + " - linking temporary table " + sTempTable)
+				Resume LinkTemp
+			Case "Link"
+				Call MyPrint("Error: " + str$(Err()) + " - linking table " + sTempTable)
+				Resume LinkTable
+			Case "Export"
+				Call MyPrint("Error: " + str$(Err()) + " - exporting records from " + sTableAlias + " into " + sLocalTable)
+				Resume ExportTable
+		End Case
+	Else
+		Note str$(Err()) + ": " + Error$()
+		Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
+		Goto ExitSub
+	End If
 
 End Sub
 
@@ -1993,6 +2093,12 @@ Sub SelectMaps (sPartnerName As String,
 '* partner equals the value passed in the call.
 '*************************************************
 
+	Dim iWaitCount As Integer
+	iWaitCount = 0
+
+	Dim ErrorType As String
+	ErrorType = ""
+
 	OnError Goto ErrorTrap
 
 	'-------------------------------------------------
@@ -2048,8 +2154,14 @@ Sub SelectMaps (sPartnerName As String,
 	Else
 		sWhereClause = " And " + sMapClauses
 	End If
+	
+SelectRecords:
+	OnError Goto SelectError
+	
 	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sWhereClause + " Into " + sTempTable + " NoSelect"
 	Run Command (sCmd)
+
+	OnError Goto ErrorTrap
 
 	'-------------------------------------------------
 	' Count the number of records that have
@@ -2089,17 +2201,30 @@ Sub SelectMaps (sPartnerName As String,
 	' Save the local table
 	'-------------------------------------------------
 	Call MyPrint("Saving temporary table ...")
+
+SaveTable:
+	OnError Goto SaveError
+	
 	sCmd = "Commit Table " + sTempTable + " As " + Chr$(34) + sLocalPath + "\" + sLocalTable + ".tab" + Chr$(34) + " TYPE NATIVE Charset " + Chr$(34) + "WindowsLatin1" + Chr$(34)
 	Run Command (sCmd)
+
+	OnError Goto ErrorTrap
 
 	'-------------------------------------------------
 	' Close the local table and re-open it (as it seems
 	' to get locked somehow and won't drop)
 	'-------------------------------------------------
 	Close Table sTempTable
+
+OpenTable:
+	OnError Goto OpenError
+	
 	sCmd = "Open Table " + Chr$(34) + sLocalPath + "\" + sLocalTable + ".tab" + Chr$(34) + " As " + sTempTable
 	Run Command (sCmd)
 
+ExportTable:
+	OnError Goto ExportError
+	
 	'-------------------------------------------------
 	' Also export the table as a text file if required
 	'-------------------------------------------------
@@ -2135,6 +2260,8 @@ Sub SelectMaps (sPartnerName As String,
 
 		End If
 
+	OnError Goto ErrorTrap
+
 	'-------------------------------------------------
 	' Translate the table to ESRI shapefile if required
 	'-------------------------------------------------
@@ -2168,12 +2295,68 @@ Sub SelectMaps (sPartnerName As String,
 		End If
 	End If
 
+ExitSub:
+
+	If iWaitCount > 0 Then
+		iFileErrorCount = iFileErrorCount + 1
+	End If
+
 	Exit Sub
-	
+
+SelectError:
+	ErrorType = "Select"	
+	Goto ErrorTrap
+
+SaveError:
+	ErrorType = "Save"	
+	Goto ErrorTrap
+
+OpenError:
+	ErrorType = "Open"	
+	Goto ErrorTrap
+
+ExportError:
+	ErrorType = "Export"	
+	Goto ErrorTrap
+
 ErrorTrap:
-	Note str$(Err()) + ": " + Error$()
-	Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
-	Exit Sub
+
+	'-------------------------------------------------
+	' Exit if we've already waited 20 seconds
+	'-------------------------------------------------
+	If iWaitCount > 20 Then
+		Note str$(Err()) + ": " + Error$()
+		Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
+		Goto ExitSub
+	End If
+
+	'-------------------------------------------------
+	' If this is a file access error then wait 
+	' for 1 second and then try again
+	'-------------------------------------------------
+	If Left$(Error$(), 18) = "Cannot access file" Then
+		Call Wait(5)
+		iWaitCount = iWaitCount + 5
+		
+		Do Case ErrorType
+			Case "Select"
+				Call MyPrint("Error: " + str$(Err()) + " - selecting records into " + sTempTable)
+				Resume SelectRecords
+			Case "Save"
+				Call MyPrint("Error: " + str$(Err()) + " - saving table " + sTempTable)
+				Resume SaveTable
+			Case "Open"
+				Call MyPrint("Error: " + str$(Err()) + " - opening table " + sTempTable)
+				Resume OpenTable
+			Case "Export"
+				Call MyPrint("Error: " + str$(Err()) + " - exporting records from " + sTempTable + " into " + sLocalTable)
+				Resume ExportTable
+		End Case
+	Else
+		Note str$(Err()) + ": " + Error$()
+		Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
+		Goto ExitSub
+	End If
 
 End Sub
 
@@ -2215,6 +2398,15 @@ Sub MyPrint(ByVal sMsg As String)
 '* Bespoke print function
 '***************************************************************
 
+	Dim iWaitCount As Integer
+	iWaitCount = 0
+
+	'-------------------------------------------------
+	' Trap any print errors
+	'-------------------------------------------------
+	OnError Goto OpenError
+
+OpenLog:
 	'-------------------------------------------------
 	' Open the log file for output
 	'-------------------------------------------------
@@ -2231,6 +2423,36 @@ Sub MyPrint(ByVal sMsg As String)
 	'-------------------------------------------------
 	Close File #1
 
+ExitSub:
+
+	If iWaitCount > 0 Then
+		iFileErrorCount = iFileErrorCount + 1
+	End If
+
+	Exit Sub
+
+OpenError:
+
+	'-------------------------------------------------
+	' Exit if we've already waited 5 seconds
+	'-------------------------------------------------
+	If iWaitCount > 5 Then
+		Note str$(Err()) + ": " + Error$()
+		Goto ExitSub
+	End If
+
+	'-------------------------------------------------
+	' If this is a file access error then wait 
+	' for 1 second and then try again
+	'-------------------------------------------------
+	If Left$(Error$(), 18) = "Cannot access file" Then
+		Call Wait(1)
+		iWaitCount = iWaitCount + 1
+		Resume OpenLog
+	Else
+		Note str$(Err()) + ": " + Error$()
+	End If
+
 End Sub
 
 Sub PrintLogFile()
@@ -2244,6 +2466,15 @@ Sub PrintLogFile()
 	Dim sCmd As String
 	sCmd = "Run Program " +  + Chr$(34) + "NotePad.exe " + sLogFileName + Chr$(34)
 	Run Command (sCmd)
+
+End Sub
+
+'***************************************************************
+'* Use the Sleep API call to put this thread to sleep
+'***************************************************************
+Sub Wait(byVal iSeconds as Integer)
+
+	Call Sleep(iSeconds * 1000)
 
 End Sub
 
