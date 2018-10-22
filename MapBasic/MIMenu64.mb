@@ -1,0 +1,191 @@
+'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
+'*
+'* Copyright © 2012 - 2018 GiGL, TVERC, SBIC
+'* 
+'* This file is part of the MapInfo tool 'DataExtractor'.
+'* 
+'* DataExtractor is free software: you can redistribute it and/or modify
+'* it under the terms of the GNU General Public License as published by
+'* the Free Software Foundation, either version 3 of the License, or
+'* (at your option) any later version.
+'* 
+'* DataExtractor is distributed in the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty of
+'* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+'* GNU General Public License for more details.
+'* 
+'* You should have received a copy of the GNU General Public License
+'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'*
+'***************************************************************
+'* MIMenu64bit v1.00
+'*
+'* Contains functions to set the tool button for MI 64bit.
+'*
+'*
+'* Created:			Andy Foy - October 2018
+'* Last revised:	Andy Foy - October 2018
+'*
+'* *****************  Version 1.00  *****************
+'* Author: Andy Foy		Date: 22/10/2018
+'* A. Initial version of code.
+'* 
+'***************************************************************
+Include "DataExtractor.def"
+
+Sub CreateToolMenu(ByVal sToolTitle As String)
+'*************************************************
+'* Set the tool menu & button
+'*************************************************
+
+	If (SystemInfo(SYS_INFO_MIPLATFORM) = MIPLATFORM_WIN64) And (SystemInfo(SYS_INFO_MAPINFO_INTERFACE) = MIINTERFACE_RIBBON) then
+
+		'-------------------------------------------------
+		' We need this to get resources, like icons, from .NET assemblies
+		'-------------------------------------------------
+		Call RegisterUriParser(New_GenericUriParser(1), "pack", -1)
+
+		'-------------------------------------------------
+		' Get the IMapInfoPro instance
+		'-------------------------------------------------
+		mtsMapInfoApplication = SystemInfo(SYS_INFO_IMAPINFOAPPLICATION)
+
+		'-------------------------------------------------
+		' Get the Ribbon from the MapInfo Pro instance
+		'-------------------------------------------------
+		mtsRibbon = GetRibbon(mtsMapInfoApplication)
+
+		'-------------------------------------------------
+		' Get the Ribbon Tab Collection from the Ribbon instance
+		'-------------------------------------------------
+		mtsRibbonTabColl = GetTabsColl(mtsRibbon)
+
+		'-------------------------------------------------
+		' Get the Ribbon Tab named "TabHome" from the Ribbon Tab Collection
+		'-------------------------------------------------
+		Dim tsRibbonTab As This
+		tsRibbonTab = GetRbnTabCollItemStr(mtsRibbonTabColl, "TabHome")
+
+		'-------------------------------------------------
+		' Get the ribbon group collection.
+		'-------------------------------------------------
+		Dim tsRibbonGroupColl As This
+		tsRibbonGroupColl = GetRbnTabGrps(tsRibbonTab)
+
+		'-------------------------------------------------
+		' Get the ribbon group called "HomeTools" in the ribbon group collection
+		'-------------------------------------------------
+		Dim tsRibbonGroup As This
+		tsRibbonGroup = GetRbnCtrlGrpCollItemStr(tsRibbonGroupColl, "HomeTools")
+
+		'-------------------------------------------------
+		' Get Group controls collection
+		'-------------------------------------------------
+		mtsGroupControlColl = GetRbnCtrlGrpCtrls(tsRibbonGroup)
+
+		'-------------------------------------------------
+		' Now add a button to the group's controls collection with a name,
+		' caption, and enumerated ControlType
+		'-------------------------------------------------
+		mtsBtn = MICtrlCollAddStrStrInt(mtsGroupControlColl, "btnDataExtractor", sToolTitle, ControlType_Button)
+
+		'-------------------------------------------------
+		' Set command to the button
+		'-------------------------------------------------
+		Call SetRbnBtnCtrlCallingHandler(mtsBtn, "DataExtractor")
+
+		'-------------------------------------------------
+		' Create & set the button tooltip
+		'-------------------------------------------------
+		Dim tsToolTip As This
+		tsToolTip = New_MapInfoRibbonToolTip()
+		Call SetMIRbnToolTipToolTipDescription(tsToolTip, "Data Extractor")
+		Call SetMIRbnToolTipToolTipText(tsToolTip, "Bulk extract SQL records and/or GIS layers that intersect with partner boundary feature(s).")
+		'Call SetMIRbnToolTipToolTipDisabledText(tsToolTip, "Bulk extract SQL records and/or GIS layers that intersect with partner boundary feature(s).")
+		Call SetRbnBtnCtrlToolTip(mtsBtn, tsToolTip)
+
+		'-------------------------------------------------
+		' Set the button icon
+		'-------------------------------------------------
+		Call SetRbnBtnCtrlSmallIcon(mtsBtn, New_Uri("D:\GitHub\DataExtractor-MapInfo\MapBasic\btnDataExtractor.png", 0))
+		Call SetRbnBtnCtrlLargeIcon(mtsBtn, New_Uri("D:\GitHub\DataExtractor-MapInfo\MapBasic\DataExtractor.png", 0))
+		Call SetRbnBtnCtrlIsLarge(mtsBtn, TRUE)
+
+		Alter Menu ID 4 Add
+			"&" + sToolTitle + "..." Calling DataExtractor
+
+	Else
+
+		'-------------------------------------------------
+		' Create the old menu style
+		'-------------------------------------------------
+		Create Menu "&" & sToolTitle As
+		   "&Run " & sToolTitle & " ..." Calling DataExtractor,
+		   "(-",
+		   "&About " & sToolTitle & " ..." Calling AboutBox,
+		   "E&xit " & sToolTitle Calling egsit
+
+		'-------------------------------------------------
+		' Add the new menu item to the Tools menu
+		'-------------------------------------------------
+		Alter Menu "Tools" Add
+			sToolTitle As sToolTitle
+
+	End If
+
+End Sub
+
+Sub EndHandler
+'***************************************************************
+'* Remove controls from ribbon
+'***************************************************************
+
+	Dim bRemoved As Logical
+
+OnError Goto HandleError
+
+	bRemoved = MICtrlCollRemove(mtsGroupControlColl, mtsBtn)
+	mtsBtn	= NULL_PTR
+	mtsGroupControlColl = NULL_PTR
+	mtsRibbonTabColl = NULL_PTR
+	mtsRibbon = NULL_PTR
+	mtsMapInfoApplication = NULL_PTR
+
+	Exit Sub
+
+HandleError:
+	Note "EndHandler: " + Error$()
+	Resume Next
+
+End Sub
+
+Sub AddIn_About
+
+	Call AboutBox
+
+End Sub
+
+Function AddIn_Name() As String
+
+	AddIn_Name	= "Data Extractor"
+
+End Function
+
+Function AddIn_Description() As String
+
+	AddIn_Description = "Bulk extract SQL records and/or GIS layers that intersect with partner boundary feature(s)."
+
+End Function
+
+Function AddIn_Version() As String
+
+	AddIn_Version = sVersion
+
+End Function
+
+Function AddIn_ImageUri() As String
+
+	AddIn_ImageUri = "D:\GitHub\DataExtractor-MapInfo\MapBasic\btnDataExtractor.png"
+
+End Function

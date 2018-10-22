@@ -1,8 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2013, 2015 GiGL
-'* Copyright © 2015 - 2017 TVERC & GiGL
+'* Copyright © 2012 - 2018 TVERC, GiGL, SBIC
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -20,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor
+'* DataExtractor v1.5.21
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,7 +28,11 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - May 2018
+'* Last revised:	Andy Foy - October 2018
+'*
+'* *****************  Version 1.5.21  ***************
+'* Author: Andy Foy		Date: 22/10/2018
+'* A. Include new tool buttons for MI Pro 64bit.
 '*
 '* *****************  Version 1.5.20  ***************
 '* Author: Andy Foy		Date: 03/05/2018
@@ -154,32 +157,25 @@ Sub Main
 '* Main sub-routine
 '***************************************************************
 
+	OnError Goto HandleError
+
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.20"
+	sVersion = "1.5.21"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
 	'-------------------------------------------------
 	Call GetToolTitle
 
-	'-------------------------------------------------
-	' Create a new menu
-	'-------------------------------------------------
-	Create Menu "&" & sToolTitle As
-	   "&Run " & sToolTitle & " ..." Calling OpenDialog,
-	   "(-",
-	   "&About " & sToolTitle & " ..." Calling AboutBox,
-	   "E&xit " & sToolTitle Calling egsit
-
-	'-------------------------------------------------
-	' Add the new menu item to the Tools menu
-	'-------------------------------------------------
-	Alter Menu "Tools" Add
-		sToolTitle As sToolTitle
-
+	Call CreateToolMenu(sToolTitle)
+	
 	Exit Sub
+
+HandleError:
+	Note "Main: " + Error$()
+	Resume Next
 
 End Sub
 
@@ -521,7 +517,7 @@ GetVariablesError:
 
 End Sub
 
-Sub OpenDialog
+Sub DataExtractor
 '***************************************************************
 '* Create the user dialog window
 '***************************************************************
@@ -2386,7 +2382,7 @@ Sub AboutBox
 		Title "Created by Andy Foy Consulting."
 		Position 10,60
 	Control StaticText
-		Title "Copyright© 2012-2013 GiGL, 2015 - 2017 TVERC & GiGL."
+		Title "Copyright© 2012 - 2018 GiGL, TVERC, SBIC."
 		Position 10,70
 	Control OKButton
 		Position 185,95
@@ -2414,7 +2410,6 @@ OpenLog:
 
 	'-------------------------------------------------
 	' Write the message passed to the output file
-
 	'-------------------------------------------------
 	Print #1, FormatDate$(CurDate()) + " " + FormatTime$(CurTime(),"H:mm:ss") + " : " + sMsg
 

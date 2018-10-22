@@ -1,0 +1,65 @@
+'* DataExtractor is a MapInfo tool to extract biodiversity information
+'* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
+'*
+'* Copyright © 2012 - 2018 GiGL, TVERC, SBIC
+'* 
+'* This file is part of the MapInfo tool 'DataExtractor'.
+'* 
+'* DataExtractor is free software: you can redistribute it and/or modify
+'* it under the terms of the GNU General Public License as published by
+'* the Free Software Foundation, either version 3 of the License, or
+'* (at your option) any later version.
+'* 
+'* DataExtractor is distributed in the hope that it will be useful,
+'* but WITHOUT ANY WARRANTY; without even the implied warranty of
+'* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+'* GNU General Public License for more details.
+'* 
+'* You should have received a copy of the GNU General Public License
+'* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
+'*
+'***************************************************************
+'* DataExtractor.def v1.01
+'*
+'* Defines global variables and declares subroutines and functions.
+'*
+'*
+'* Created:			Andy Foy - October 2018
+'* Last revised:	Andy Foy - October 2018
+'***************************************************************
+
+'-------------------------------------------------
+' Define the variables
+'-------------------------------------------------
+Define MIXmlDocument IntPtr
+Define MIXmlNode IntPtr
+Define MIXmlNodeList IntPtr
+Define MIXmlNamedNodeMap IntPtr
+Define MIXMLSchemaCollection IntPtr
+Define MIXML_LIB_NAME "MapInfo.XmlUtil.dll"
+Define MIWEBSERVICES_LIB_NAME "MapInfo.XmlUtil.dll"
+
+'IMapInfoPro:
+Dim mtsMapInfoApplication as This
+'The Ribbon:
+Dim mtsRibbon as This
+'The Tab Collection of the Ribbon:
+Dim mtsRibbonTabColl as This
+'The Control Collection of the group:
+Dim mtsGroupControlColl As This
+'The Button we are adding:
+Dim mtsBtn As This
+
+'-------------------------------------------------
+' Declare the subroutines
+'-------------------------------------------------
+Declare Sub AddIn_About
+Declare Sub EndHandler
+
+'-------------------------------------------------
+' Declare the functions
+'-------------------------------------------------
+Declare Function AddIn_Name() As String
+Declare Function AddIn_Description() As String
+Declare Function AddIn_Version() As String
+Declare Function AddIn_ImageUri() As String
