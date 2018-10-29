@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.21
+'* DataExtractor v1.5.22
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,6 +29,12 @@
 '*
 '* Created:			Andy Foy - November 2012
 '* Last revised:	Andy Foy - October 2018
+'*
+'* *****************  Version 1.5.22  ***************
+'* Author: Andy Foy		Date: 29/10/2018
+'* A. Get partner layer spatial column name and pass
+'*    to SQL stored procedure.
+'* B. Add option to use centroids for polygons.
 '*
 '* *****************  Version 1.5.21  ***************
 '* Author: Andy Foy		Date: 22/10/2018
@@ -162,7 +168,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.21"
+	sVersion = "1.5.22"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -347,6 +353,9 @@ Sub GetDefaultValues
 
 					' Name of column of Tags list in the partner table
 					sTagsColumn = GetSingleNodeValue(hXMLNode, "TagsColumn")
+
+					' Name of column of spatial geometry in the partner table
+					sSpatialColumn = GetSingleNodeValue(hXMLNode, "SpatialColumn")
 
 					' The options for the selection types
 					sSelectTypeOptions = GetSingleNodeValue(hXMLNode, "SelectTypeOptions")
@@ -617,12 +626,22 @@ Sub DataExtractor
 		'Into bClearLog
 
 	'-------------------------------------------------
+	' Add a checkbox for selecting polygons by centroids
+	'-------------------------------------------------
+	Control CheckBox
+		ID 7
+		Title "Select polygons by centroids?"
+		Position 10,255
+		Value FALSE
+		'Into bUseCentroids
+
+	'-------------------------------------------------
 	' Add a popup menu for picking the select type
 	'-------------------------------------------------
 	Control StaticText Title "Selection Type:"
 		Position 190,210
 	Control PopupMenu
-		ID 7
+		ID 10
 		Value iDefaultSelectType
 		Title From Variable sSelectTypeOptions
 		Position 190,220
@@ -893,10 +912,28 @@ SetDefaults:
 	End If
 
 	'-------------------------------------------------
+	' Set the default value for the select polygons
+	' by centroids checkbox
+	'-------------------------------------------------
+	If UCase$(sDefaultUseCentroids) = "YES" OR UCase$(sDefaultUseCentroids) = "Y" Then
+		Alter Control 7 Value TRUE
+	Else
+		Alter Control 7 Value FALSE
+	End If
+
+	'-------------------------------------------------
+	' Hide the select polygons by centroid checkbox
+	' if no default set
+	'-------------------------------------------------
+	If sDefaultUseCentroids = "" Then
+		Alter Control 7 Hide
+	End If
+
+	'-------------------------------------------------
 	' Set the default value for the select type
 	' popup menu
 	'-------------------------------------------------
-	Alter Control 7 Value iDefaultSelectType
+	Alter Control 10 Value iDefaultSelectType
 
 Exit Sub
 
@@ -941,7 +978,8 @@ Sub CheckSelection
 	bZipFiles = ReadControlValue(4)
 	bConfidentialSurveys = ReadControlValue(5)
 	bClearLog = ReadControlValue(6)
-	iSelectType = ReadControlValue(7)
+	bUseCentroids = ReadControlValue(7)
+	iSelectType = ReadControlValue(10)
 
 	'-------------------------------------------------
 	' Check if the user has selected at least one partner
@@ -1065,6 +1103,26 @@ Sub CheckSelection
 		'-------------------------------------------------
 		iMapTable = ReadControlValue(3)
 	Loop
+
+	'-------------------------------------------------
+	' Output options to log file
+	'-------------------------------------------------
+	If bZipFiles = True Then
+		Call MyPrint("Zipping extract files ...")
+	Else
+		Call MyPrint("Leaving extract files unzipped ...")
+	End If
+	If bConfidentialSurveys = True Then
+		Call MyPrint("Including confidential surveys ...")
+	Else
+		Call MyPrint("Excluding confidential surveys ...")
+	End If
+	If bUseCentroids = True Then
+		Call MyPrint("Selecting polygons by centroids ...")
+	Else
+		Call MyPrint("Selecting polygons by geometry ...")
+	End If
+	Call MyPrint("Performing selection type '" + iSelectType + "' ...")
 
 	'-------------------------------------------------
 	' Clear the log file (if it exists)
@@ -1222,14 +1280,6 @@ Sub ProcessExtracts
 	' the selected table for the selected partner
 	'-------------------------------------------------
 	If sTableType = "SQL" Then
-		If bConfidentialSurveys = True Then
-			Call MyPrint("Including confidential surveys ...")
-		Else
-			Call MyPrint("Excluding confidential surveys ...")
-		End If
-
-		Call MyPrint("Performing selection type " + iSelectType + " ...")
-
 		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
 		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapColumns, sMapClauses)
@@ -1335,6 +1385,16 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Call MyPrint("Processing table = '" + sTableName + "' ...")
 
 	'-------------------------------------------------
+	' Set the use centroids parameter
+	'-------------------------------------------------
+	Dim iUseCentroids As Integer
+	If bUseCentroids = True Then
+		iUseCentroids = 1
+	Else
+		iUseCentroids = 0
+	End If
+
+	'-------------------------------------------------
 	' Execute the SQL Server stored procedure to select
 	' the records intersecting with the current
 	' partner boundary
@@ -1344,7 +1404,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 
 	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
-	 + sPartnerName + "', '" + sTagsColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "'")
+	 + sPartnerName + "', '" + sTagsColumn + "', " + sSpatialColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "', " + iUseCentroids)
 
 	Call MyPrint("Spatial selection complete.")
 

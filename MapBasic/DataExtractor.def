@@ -330,6 +330,7 @@ Global sExportColumn As String
 Global sSQLFilesColumn As String
 Global sMapFilesColumn As String
 Global sTagsColumn As String
+Global sSpatialColumn As String
 Global sSelectTypeOptions As String
 Global iDefaultSelectType As Integer
 Global iRecMax As Integer
@@ -368,6 +369,7 @@ Global nConn As Integer
 Global bZipFiles As Logical
 Global bConfidentialSurveys As Logical
 Global bClearLog As Logical
+Global bUseCentroids As Logical
 Global iSelectType As Integer
 
 Global sLastShortName As String

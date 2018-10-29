@@ -114,7 +114,12 @@ used by the MapBasic tool to select and export data for partners.
 	<value>PartnerTags</value>
   </TagsColumn>
 
-	<!-- The options for the selection types -->
+  <!-- The name of the column in the partner GIS layer containing the spatial geometry -->
+  <SpatialColumn>
+	<value>SP_GEOMETRY</value>
+  </SpatialColumn>
+
+  <!-- The options for the selection types -->
   <SelectTypeOptions>
 	<value>Spatial Only;Survey Tags Only;Spatial and Survey Tags</value>
   </SelectTypeOptions>
