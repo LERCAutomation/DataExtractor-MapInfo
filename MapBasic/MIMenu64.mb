@@ -25,7 +25,7 @@
 '*
 '*
 '* Created:			Andy Foy - October 2018
-'* Last revised:	Andy Foy - October 2018
+'* Last revised:		Andy Foy - October 2018
 '*
 '* *****************  Version 1.00  *****************
 '* Author: Andy Foy		Date: 22/10/2018
@@ -108,8 +108,8 @@ Sub CreateToolMenu(ByVal sToolTitle As String)
 		'-------------------------------------------------
 		' Set the button icon
 		'-------------------------------------------------
-		Call SetRbnBtnCtrlSmallIcon(mtsBtn, New_Uri("D:\GitHub\DataExtractor-MapInfo\MapBasic\btnDataExtractor.png", 0))
-		Call SetRbnBtnCtrlLargeIcon(mtsBtn, New_Uri("D:\GitHub\DataExtractor-MapInfo\MapBasic\DataExtractor.png", 0))
+		Call SetRbnBtnCtrlSmallIcon(mtsBtn, New_Uri(ApplicationDirectory$() + "btnDataExtractor.png", 0))
+		Call SetRbnBtnCtrlLargeIcon(mtsBtn, New_Uri(ApplicationDirectory$() + "DataExtractor.png", 0))
 		Call SetRbnBtnCtrlIsLarge(mtsBtn, TRUE)
 
 		Alter Menu ID 4 Add

@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.22
+'* DataExtractor v1.5.23
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,12 @@
 '*
 '*
 '* Created:			Andy Foy - November 2012
-'* Last revised:	Andy Foy - October 2018
+'* Last revised:		Andy Foy - December 2018
+'*
+'* *****************  Version 1.5.23  ***************
+'* Author: Andy Foy		Date: 13/12/2018
+'* A. Fix parameter bug calling AFSelectSppRecords.
+'* B. Use schema when calling stored procedures.
 '*
 '* *****************  Version 1.5.22  ***************
 '* Author: Andy Foy		Date: 29/10/2018
@@ -168,7 +173,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.22"
+	sVersion = "1.5.23"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1402,9 +1407,9 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Dim nStmt1 As Integer
 	Call MyPrint("Executing spatial selection ...")
 
-	nStmt1 = Server_Execute(nConn, "EXECUTE dbo.AFSelectSppRecords '" + sDefaultSchema
+	nStmt1 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFSelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
-	 + sPartnerName + "', '" + sTagsColumn + "', " + sSpatialColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "', " + iUseCentroids)
+	 + sPartnerName + "', '" + sTagsColumn + "', '" + sSpatialColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "', " + iUseCentroids)
 
 	Call MyPrint("Spatial selection complete.")
 
@@ -1747,6 +1752,8 @@ ExportTable:
 			Set ProgressBars On
 
 		ElseIf UCase$(sExport) = "TXT" Then
+
+
 			Call MyPrint("Exporting as a TXT ...")
 
 			Set ProgressBars Off
@@ -1757,6 +1764,7 @@ ExportTable:
 				Delimiter ","
 				CharSet "WindowsLatin1"
 				Titles
+
 				Overwrite
 
 			Set ProgressBars On
@@ -1848,7 +1856,7 @@ NextClause:
 	'-------------------------------------------------
 CleanUp:
 	Dim nStmt3 As Integer
-	nStmt3 = Server_Execute(nConn, "EXECUTE dbo.AFClearSppSubset '" + sDefaultSchema
+	nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
 	+ "', '" + sTableName + "', '" + sUser + "'")
 
 	'-------------------------------------------------
@@ -2012,8 +2020,10 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 						'-------------------------------------------------
 						Dim sClause As String
 						sClause = GetSingleNodeValue(hXMLSymbolNode, "Clause")
-						If sClause <> "" Then
-							sClause = " And " & sClause
+						Dim sSQLClause As String
+						sSQLClause = sClause
+						If sSQLClause <> "" Then
+							sSQLClause = " And " & sClause
 						End If
 
 						'-------------------------------------------------
@@ -2027,7 +2037,7 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 						' matching the required SQL clause
 						'-------------------------------------------------
 						Dim sCmd As String
-						sCmd = "Select * From " + sTempTable + " Where Str$(obj) = """ + sObject + """ " + sClause + " Into NewStyle NoSelect"
+						sCmd = "Select * From " + sTempTable + " Where Str$(obj) = """ + sObject + """ " + sSQLClause + " Into NewStyle NoSelect"
 						Run Command (sCmd)
 
 						'-------------------------------------------------
@@ -2036,7 +2046,7 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 						Dim iRows As Integer
 						iRows = TableInfo(NewStyle, TAB_INFO_NROWS)
 
-						Call MyPrint("Setting " + sObject + " style for " + FormatNumber$(iRows) + " rows where " + sClause)
+						Call MyPrint("Setting " + sObject + " style for " + FormatNumber$(iRows) + " rows where ... " + sClause)
 
 						'-------------------------------------------------
 						' If any rows were selected then set the styles
@@ -2376,6 +2386,7 @@ ExportError:
 	Goto ErrorTrap
 
 ErrorTrap:
+
 
 	'-------------------------------------------------
 	' Exit if we've already waited 20 seconds

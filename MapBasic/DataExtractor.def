@@ -25,7 +25,7 @@
 '*
 '*
 '* Created:			Andy Foy - November 2013
-'* Last revised:	Andy Foy - October 2018
+'* Last revised:	Andy Foy - December 2018
 '***************************************************************
 
 Include "MapBasic.def"
@@ -337,6 +337,7 @@ Global iRecMax As Integer
 Global sDefaultZip As String
 Global sConfidentialClause As String
 Global sDefaultConfidential As String
+Global sDefaultUseCentroids As String
 Global sUTPath As String
 Global sUTCommand As String
 
