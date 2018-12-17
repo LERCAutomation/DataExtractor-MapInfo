@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.23
+'* DataExtractor v1.5.24
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -27,8 +27,12 @@
 '* which partners and which tables to process.
 '*
 '*
-'* Created:			Andy Foy - November 2012
-'* Last revised:		Andy Foy - December 2018
+'* Created:         Andy Foy - November 2012
+'* Last revised:    Andy Foy - December 2018
+'*
+'* *****************  Version 1.5.24  ***************
+'* Author: Andy Foy		Date: 17/12/2018
+'* A. Always disconnect SQL connection.
 '*
 '* *****************  Version 1.5.23  ***************
 '* Author: Andy Foy		Date: 13/12/2018
@@ -173,7 +177,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.23"
+	sVersion = "1.5.24"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -666,6 +670,13 @@ Sub DataExtractor
 		Calling CheckSelection
 
 Done:
+	'-------------------------------------------------
+	' Disconnect the connection to the SQL Server database
+	'-------------------------------------------------
+	If nConn <> 0 Then
+		Server nConn Disconnect
+	End If
+
 	Exit Sub
 	
 ErrorTrap:
@@ -1189,11 +1200,6 @@ Sub CheckSelection
 		' Close the dialog
 		'-------------------------------------------------
 		Dialog Remove
-
-		'-------------------------------------------------
-		' Disconnect the connection to the SQL Server database
-		'-------------------------------------------------
-		Server nConn Disconnect
 
 	End If
 
@@ -1752,7 +1758,6 @@ ExportTable:
 			Set ProgressBars On
 
 		ElseIf UCase$(sExport) = "TXT" Then
-
 
 			Call MyPrint("Exporting as a TXT ...")
 
