@@ -19,13 +19,13 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor.def v1.05
+'* DataExtractor.def v1.06
 '*
 '* Defines global variables and declares subroutines and functions.
 '*
 '*
 '* Created:			Andy Foy - November 2013
-'* Last revised:	Andy Foy - December 2018
+'* Last revised:	Andy Foy - January 2019
 '***************************************************************
 
 Include "MapBasic.def"
@@ -72,6 +72,7 @@ End Type
 Type FileDetails
 	Node As String
 	TableName As String
+	OutputName As String
 	Columns As String
 	Clauses As String
 End Type
@@ -79,6 +80,7 @@ End Type
 Type MapDetails
 	Node As String
 	TableName As String
+	OutputName As String
 	Columns As String
 	Clauses As String
 End Type
@@ -96,6 +98,7 @@ End Type
 Type ProcessDetails
 	Node As String
 	TableName As String
+	OutputName As String
 	TableType As String
 	Partner As String
 	Short As String
@@ -146,6 +149,7 @@ Declare Sub SelectMaps
 	sMapFiles As String,
 	sNodeName as String,
 	sTableName As String,
+	sOutputName As String,
 	sMapColumns As String,
 	sMapClauses As String)
 Declare Sub AboutBox
@@ -247,6 +251,8 @@ Declare Function StringReplace
 	ByVal sSearchFor As String,
 	ByVal sReplaceWith As String) As String
 Declare Function GetUserID() As String
+Declare Function MonthNumToShortName
+	(ByVal iMonthNo As Integer) As String
 
 Declare Function CreateProcessA Lib "kernel32"
 	(ByVal lpApplicationName As Integer,
@@ -260,7 +266,7 @@ Declare Function CreateProcessA Lib "kernel32"
 	lpStartupInfo As STARTUPINFO,
 	lpProcessInformation As PROCESS_INFORMATION) As Integer
 Declare Function GetUserName Lib "advapi32.dll" Alias "GetUserNameA" 
-  (lpBuffer As String, nSize As Integer) As Integer
+	(lpBuffer As String, nSize As Integer) As Integer
 
 Declare Function MIXmlDocumentCreate Lib MIXML_LIB_NAME
 	Alias "MIXmlDocumentCreate" () As MIXmlDocument
@@ -372,6 +378,12 @@ Global bConfidentialSurveys As Logical
 Global bClearLog As Logical
 Global bUseCentroids As Logical
 Global iSelectType As Integer
+
+Global sDateDD As String
+Global sDateMM As String
+Global sDateMMM As String
+Global sDateYY As String
+Global sDateYYYY As String
 
 Global sLastShortName As String
 

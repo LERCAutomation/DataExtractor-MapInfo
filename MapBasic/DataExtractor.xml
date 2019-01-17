@@ -164,9 +164,9 @@ used by the MapBasic tool to select and export data for partners.
 	the extract tables -->
   <SQLTables>
 	<GiGL_AllSpp>
-		<TableName>
-			<Value>GiGL_Species_All</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_All_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -199,9 +199,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_AllSpp>
 	<DesignatedSpp>
-		<TableName>
-			<Value>GiGL_Species_Designated</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Designated_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -234,9 +234,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</DesignatedSpp>
 	<GiGL_LISISpp>
-		<TableName>
-			<Value>GiGL_Species_LISI</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_LISI_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -269,9 +269,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_LISISpp>
 	<GiGL_Birds>
-		<TableName>
-			<Value>GiGL_Species_Birds</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Birds_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -304,9 +304,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_Birds>
 	<GiGL_SppAbsence>
-		<TableName>
-			<Value>GiGL_Species_Absence</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Absence_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -339,9 +339,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_SppAbsence>
 	<GiGL_CoarseResolutionSpp>
-		<TableName>
-			<Value>GiGL_Species_Coarse</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Coarse_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -394,9 +394,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_CoarseResolutionSpp>
 	<GiGL_Plants>
-		<TableName>
-			<Value>GiGL_Species_Plants</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Plants_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -429,9 +429,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_Plants>
 	<GiGL_OtherSpp>
-		<TableName>
-			<Value>GiGL_Species_Other</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Other_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -464,9 +464,9 @@ used by the MapBasic tool to select and export data for partners.
 		</Symbology>
 	</GiGL_OtherSpp>
 	<GiGL_HistoricSpp>
-		<TableName>
-			<Value>GiGL_Species_Historic</Value>
-		</TableName>
+		<OutputName>
+			<Value>GiGL_Species_Historic_%partner%</Value>
+		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
 		</Columns>
@@ -506,6 +506,9 @@ used by the MapBasic tool to select and export data for partners.
 		<TableName>
 			<Value>GiGL_Habitat</Value>
 		</TableName>
+		<OutputName>
+			<Value>GiGL_Habitat_%partner%</Value>
+		</OutputName>
 	  	<Columns>
 			<Value>HabitatShortName, HabitatLongName, HabitatClassification, ClassificationVersion, NBN_biotope, SiteName, SiteNameOther, SiteRef, Borough, NBN_Loc, PolygonID, GISlinkID, OriginalPolygonRef, AreaHa, CentroidX, CentroidY, SurveyDate, Surveyor, DataCreatedDate, DataCreatedUser, DataCreatedComment, LastModifiedDate, LastModifiedUser, LastModifiedComment, BaseMap, Digitisation, FurtherInfo</Value>
 		</Columns>
@@ -517,6 +520,9 @@ used by the MapBasic tool to select and export data for partners.
 		<TableName>
 			<Value>GiGL_BAP_Condition</Value>
 		</TableName>
+		<OutputName>
+			<Value>GiGL_BAP_Condition_%partner%</Value>
+		</OutputName>
 	  	<Columns>
 			<Value>ConditionShort, ConditionLong, SuitabilityShort, SuitabilityLong, OriginalHabShort, OriginalHabLong, SiteName, SiteNameOther, SiteRef, Borough, PolygonID, GISlinkID, OriginalPolygonRef, PolygonAreaHa, CentroidX, CentroidY, DataCreatedDate, DataCreatedUser, DataCreatedComment, BaseMap, Digitisation, FurtherInfo</Value>
 		</Columns>

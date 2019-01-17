@@ -424,3 +424,38 @@ Function GetUserID() As String
 	GetUserID = sUserID
 
 End Function
+
+Function MonthNumToShortName( ByVal iMonthNo As Integer ) As String
+'*************************************************
+'* Converts a month number to a short name
+'* eg 3 -> Mar
+'*************************************************
+
+	Do Case iMonthNo
+		Case 1
+			MonthNumToShortName = "Jan"
+		Case 2
+			MonthNumToShortName = "Feb"
+		Case 3
+			MonthNumToShortName = "Mar"
+		Case 4
+			MonthNumToShortName = "Apr"
+		Case 5
+			MonthNumToShortName = "May"
+		Case 6
+			MonthNumToShortName = "Jun"
+		Case 7
+			MonthNumToShortName = "Jul"
+		Case 8
+			MonthNumToShortName = "Aug"
+		Case 9
+			MonthNumToShortName = "Sep"
+		Case 10
+			MonthNumToShortName = "Oct"
+		Case 11
+			MonthNumToShortName = "Nov"
+		Case 12
+			MonthNumToShortName = "Dec"
+	End Case
+	
+End Function

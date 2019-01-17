@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.24
+'* DataExtractor v1.5.25
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,13 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - December 2018
+'* Last revised:    Andy Foy - January 2019
+'*
+'* *****************  Version 1.5.25  ***************
+'* Author: Andy Foy		Date: 16/01/2019
+'* A. Add partner abbreviation as XML variable.
+'* B. Add date components as XML variables.
+'* C. Add new OutputName XML node to SQL and Map nodes.
 '*
 '* *****************  Version 1.5.24  ***************
 '* Author: Andy Foy		Date: 17/12/2018
@@ -177,7 +183,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.24"
+	sVersion = "1.5.25"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -423,7 +429,7 @@ Sub GetDefaultValues
 						SQLFiles(i).Node = GetNodeName(hXMLFilesNode)
 
 						' Name of the MapInfo table to be created
-						SQLFiles(i).TableName = GetSingleNodeValue(hXMLFilesNode, "TableName")
+						SQLFiles(i).OutputName = GetSingleNodeValue(hXMLFilesNode, "OutputName")
 
 						' SQL statement used to retrieve the required columns from the temporary SQL table
 						SQLFiles(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
@@ -472,8 +478,14 @@ Sub GetDefaultValues
 						' Name of the Map node
 						AllMaps(i).Node = GetNodeName(hXMLFilesNode)
 
-						' Name of the MapInfo input and output Map table
+						' Name of the MapInfo input table
 						AllMaps(i).TableName = GetSingleNodeValue(hXMLFilesNode, "TableName")
+
+						' Name of the MapInfo output table to be created
+						AllMaps(i).OutputName = GetSingleNodeValue(hXMLFilesNode, "OutputName")
+
+						' Default the output name to the input name if blank
+						If AllMaps(i).OutputName = "" Then AllMaps(i).OutputName = AllMaps(i).TableName End If
 
 						' SQL statement used to retrieve the required rows from the loaded map table
 						AllMaps(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
@@ -861,6 +873,7 @@ Sub DialogSetup
 			OpenMapsList(j) = AllMaps(i).Node + " ---> " + AllMaps(i).TableName
 			OpenMaps(j).Node = AllMaps(i).Node
 			OpenMaps(j).TableName = AllMaps(i).TableName
+			OpenMaps(j).OutputName = AllMaps(i).OutputName
 			OpenMaps(j).Columns = AllMaps(i).Columns
 			OpenMaps(j).Clauses = AllMaps(i).Clauses
 		Else
@@ -1025,6 +1038,15 @@ Sub CheckSelection
 	sLastShortName = ""
 
 	'-------------------------------------------------
+	' Set the date variables
+	'-------------------------------------------------
+	sDateDD = Day(CurDate())
+	sDateMM = Right$("0" + Month(CurDate()), 2)
+	sDateMMM = MonthNumToShortName(sDateMM)
+	sDateYYYY = Str$(Year(CurDate()))
+	sDateYY = Right$(sDateYYYY, 2)
+
+	'-------------------------------------------------
 	' Reset the lists
 	'-------------------------------------------------
 	iPartner = ReadControlValue(1)
@@ -1062,6 +1084,7 @@ Sub CheckSelection
 
 			ProcessSelected(iExtractTot).Node = ""
 			ProcessSelected(iExtractTot).TableName = SQLTablesList(iSQLTable)
+			ProcessSelected(iExtractTot).OutputName = ""
 			ProcessSelected(iExtractTot).TableType = "SQL"
 			ProcessSelected(iExtractTot).Partner = Partners(iPartner).Name
 			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
@@ -1085,6 +1108,7 @@ Sub CheckSelection
 
 			ProcessSelected(iExtractTot).Node = OpenMaps(iMapTable).Node
 			ProcessSelected(iExtractTot).TableName = OpenMaps(iMapTable).TableName
+			ProcessSelected(iExtractTot).OutputName = OpenMaps(iMapTable).OutputName
 			ProcessSelected(iExtractTot).TableType = "Map"
 			ProcessSelected(iExtractTot).Partner = Partners(iPartner).Name
 			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
@@ -1121,26 +1145,6 @@ Sub CheckSelection
 	Loop
 
 	'-------------------------------------------------
-	' Output options to log file
-	'-------------------------------------------------
-	If bZipFiles = True Then
-		Call MyPrint("Zipping extract files ...")
-	Else
-		Call MyPrint("Leaving extract files unzipped ...")
-	End If
-	If bConfidentialSurveys = True Then
-		Call MyPrint("Including confidential surveys ...")
-	Else
-		Call MyPrint("Excluding confidential surveys ...")
-	End If
-	If bUseCentroids = True Then
-		Call MyPrint("Selecting polygons by centroids ...")
-	Else
-		Call MyPrint("Selecting polygons by geometry ...")
-	End If
-	Call MyPrint("Performing selection type '" + iSelectType + "' ...")
-
-	'-------------------------------------------------
 	' Clear the log file (if it exists)
 	'-------------------------------------------------
 	If bClearLog = True Then
@@ -1161,15 +1165,35 @@ Sub CheckSelection
 		End If
 	End If
 
+	Call MyPrint("----------------------------------------------------------------------")
+	Call MyPrint("Process started!")
+	Call MyPrint("----------------------------------------------------------------------")
+
+	'-------------------------------------------------
+	' Output options to log file
+	'-------------------------------------------------
+	If bZipFiles = True Then
+		Call MyPrint("Zipping extract files ...")
+	Else
+		Call MyPrint("Leaving extract files unzipped ...")
+	End If
+	If bConfidentialSurveys = True Then
+		Call MyPrint("Including confidential surveys ...")
+	Else
+		Call MyPrint("Excluding confidential surveys ...")
+	End If
+	If bUseCentroids = True Then
+		Call MyPrint("Selecting polygons by centroids ...")
+	Else
+		Call MyPrint("Selecting polygons by geometry ...")
+	End If
+	Call MyPrint("Performing selection type '" + iSelectType + "' ...")
+	Call MyPrint("")
+
 	'-------------------------------------------------
 	' Reset the file access error counter
 	'-------------------------------------------------
 	iFileErrorCount = 0
-
-	Call MyPrint("----------------------------------------------------------------------")
-	Call MyPrint("Process started!")
-	Call MyPrint("----------------------------------------------------------------------")
-	Call MyPrint("")
 
 	'-------------------------------------------------
 	' Process the selections one by one
@@ -1224,9 +1248,10 @@ Sub ProcessExtracts
 
 	OnError Goto ErrorTrap
 
-	Dim sNodeName, sTableName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses As String
+	Dim sNodeName, sTableName, sOutputName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses As String
 	sNodeName = ProcessSelected(iExtractCnt).Node
 	sTableName = ProcessSelected(iExtractCnt).TableName
+	sOutputName = ProcessSelected(iExtractCnt).OutputName
 	sTableType = ProcessSelected(iExtractCnt).TableType
 	sPartnerName = ProcessSelected(iExtractCnt).Partner
 	sShortName = ProcessSelected(iExtractCnt).Short
@@ -1293,7 +1318,7 @@ Sub ProcessExtracts
 	If sTableType = "SQL" Then
 		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
-		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sMapColumns, sMapClauses)
+		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sOutputName, sMapColumns, sMapClauses)
 	End If
 
 	Call MyPrint("Completed process " + iExtractCnt + " of " + iExtractTot + ".")
@@ -1473,9 +1498,27 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		sNodeName = SQLFiles(i).Node
 		If Instr(1, Ucase$(sSQLFiles), Ucase$(sNodeName)) > 0 then
-			sLocalTable = SQLFiles(i).TableName
+			sLocalTable = SQLFiles(i).OutputName
 		Else
 			Goto NextClause
+		End If
+
+		'-------------------------------------------------
+		' Replace any variables
+		'-------------------------------------------------
+		sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
+		sLocalTable = StringReplace(sLocalTable, "%dd%", sDateDD)
+		sLocalTable = StringReplace(sLocalTable, "%mm%", sDateMM)
+		sLocalTable = StringReplace(sLocalTable, "%mmm%", sDateMMM)
+		sLocalTable = StringReplace(sLocalTable, "%yy%", sDateYY)
+		sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
+
+		'-------------------------------------------------
+		' Check if the output name is not too long
+		'-------------------------------------------------
+		If Len(sLocalTable) > 31 Then
+			Call MyPrint("Output name '" + sLocalTable + "' too long - name truncated.")
+			sLocalTable = Left$(sLocalTable, 31)
 		End If
 
 		'-------------------------------------------------
@@ -1483,7 +1526,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		'-------------------------------------------------
 		Dim sLocalPath, sTempTable As String
 		sLocalPath = sDefaultPath + "\" + sShortName
-		sTempTable = Left$(sLocalTable + "_" + sShortName, 31)
+		sTempTable = Left$("T" + sLocalTable + "_" + sShortName, 31)
 
 		Call MyPrint("")
 		Call MyPrint("Extracting '" + sLocalTable + "' ...")
@@ -2155,6 +2198,7 @@ Sub SelectMaps (sPartnerName As String,
 	sMapFiles As String,
 	sNodeName as String,
 	sTableName As String,
+	sOutputName As String,
 	sMapColumns As String,
 	sMapClauses As String)
 '*************************************************
@@ -2200,8 +2244,26 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	Dim sLocalPath, sLocalTable, sTempTable As String
 	sLocalPath = sDefaultPath + "\" + sShortName
-	sLocalTable = sTableName
-	sTempTable = Left$(sTableName + "_" + sShortName, 31)
+	sLocalTable = sOutputName
+	sTempTable = Left$("T" + sTableName + "_" + sShortName, 31)
+
+	'-------------------------------------------------
+	' Replace any variables
+	'-------------------------------------------------
+	sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
+	sLocalTable = StringReplace(sLocalTable, "%dd%", sDateDD)
+	sLocalTable = StringReplace(sLocalTable, "%mm%", sDateMM)
+	sLocalTable = StringReplace(sLocalTable, "%mmm%", sDateMMM)
+	sLocalTable = StringReplace(sLocalTable, "%yy%", sDateYY)
+	sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
+	
+	'-------------------------------------------------
+	' Check if the output name is not too long
+	'-------------------------------------------------
+	If Len(sLocalTable) > 31 Then
+		Call MyPrint("Output name '" + sLocalTable + "' too long - name truncated.")
+		sLocalTable = Left$(sLocalTable, 31)
+	End If
 
 	'-------------------------------------------------
 	' Check if the local table is already/still open
@@ -2300,6 +2362,7 @@ ExportTable:
 	' Also export the table as a text file if required
 	'-------------------------------------------------
 		If UCase$(sExport) = "CSV" Then
+
 			Call MyPrint("Exporting as a CSV ...")
 
 			Set ProgressBars Off
@@ -2315,6 +2378,7 @@ ExportTable:
 			Set ProgressBars On
 
 		ElseIf UCase$(sExport) = "TXT" Then
+
 			Call MyPrint("Exporting as a TXT ...")
 
 			Set ProgressBars Off
@@ -2377,6 +2441,7 @@ ExitSub:
 SelectError:
 	ErrorType = "Select"	
 	Goto ErrorTrap
+
 
 SaveError:
 	ErrorType = "Save"	
