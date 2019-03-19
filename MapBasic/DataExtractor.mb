@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.25
+'* DataExtractor v1.5.26
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,14 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - January 2019
+'* Last revised:    Andy Foy - February 2019
+'*
+'* *****************  Version 1.5.26  ***************
+'* Author: Andy Foy		Date: 11/02/2019
+'* A. Add option to trigger macro/script to
+'*    post-process each output file.
+'* B. Add option to override partner specified output type.
+'* C. Enable clauses to contain 'Group By' or 'Order By'.
 '*
 '* *****************  Version 1.5.25  ***************
 '* Author: Andy Foy		Date: 16/01/2019
@@ -431,12 +438,18 @@ Sub GetDefaultValues
 						' Name of the MapInfo table to be created
 						SQLFiles(i).OutputName = GetSingleNodeValue(hXMLFilesNode, "OutputName")
 
+						' Output type to produce (overrides the partner specification)
+						SQLFiles(i).OutputType = GetSingleNodeValue(hXMLFilesNode, "OutputType")
+
 						' SQL statement used to retrieve the required columns from the temporary SQL table
 						SQLFiles(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
 
 						' SQL clause used to retrieve the required rows from the temporary SQL table
 						SQLFiles(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clauses")
 						
+						' Macro/Script to call to format the extract of the map table
+						SQLFiles(i).Macro = GetSingleNodeValue(hXMLFilesNode, "Macro")
+
 						' Remove CR, LF and Tab chars
 						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(10), "")
 						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(13), "")
@@ -484,6 +497,9 @@ Sub GetDefaultValues
 						' Name of the MapInfo output table to be created
 						AllMaps(i).OutputName = GetSingleNodeValue(hXMLFilesNode, "OutputName")
 
+						' Output type to produce (overrides the partner specification)
+						AllMaps(i).OutputType = GetSingleNodeValue(hXMLFilesNode, "OutputType")
+
 						' Default the output name to the input name if blank
 						If AllMaps(i).OutputName = "" Then AllMaps(i).OutputName = AllMaps(i).TableName End If
 
@@ -492,6 +508,9 @@ Sub GetDefaultValues
 
 						' SQL clause used to retrieve the required rows from the loaded map table
 						AllMaps(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clause")
+
+						' Macro/Script to call to format the extract of the map table
+						AllMaps(i).Macro = GetSingleNodeValue(hXMLFilesNode, "Macro")
 
 						' Remove CR, LF and Tab chars
 						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(10), "")
@@ -758,8 +777,6 @@ Sub DialogSetup
 		'-------------------------------------------------
 		Fetch First from PartnerList
 
-		Dim sPartner, sShort, sNote, sFormat, sExport, sSQLFiles, sMapFiles As String
-
 		'-------------------------------------------------
 		' Loop through all the partners in the partners
 		' table and add them to the Partners list
@@ -874,8 +891,10 @@ Sub DialogSetup
 			OpenMaps(j).Node = AllMaps(i).Node
 			OpenMaps(j).TableName = AllMaps(i).TableName
 			OpenMaps(j).OutputName = AllMaps(i).OutputName
+			OpenMaps(j).OutputType = AllMaps(i).OutputType
 			OpenMaps(j).Columns = AllMaps(i).Columns
 			OpenMaps(j).Clauses = AllMaps(i).Clauses
+			OpenMaps(j).Macro = AllMaps(i).Macro
 		Else
 			'-------------------------------------------------
 			' Store the name of the closed table
@@ -1085,6 +1104,7 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Node = ""
 			ProcessSelected(iExtractTot).TableName = SQLTablesList(iSQLTable)
 			ProcessSelected(iExtractTot).OutputName = ""
+			ProcessSelected(iExtractTot).OutputType = ""
 			ProcessSelected(iExtractTot).TableType = "SQL"
 			ProcessSelected(iExtractTot).Partner = Partners(iPartner).Name
 			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
@@ -1093,6 +1113,7 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Files = Partners(iPartner).SQLFiles
 			ProcessSelected(iExtractTot).Columns = ""
 			ProcessSelected(iExtractTot).Clauses = ""
+			ProcessSelected(iExtractTot).Macro = ""
 
 			'-------------------------------------------------
 			' Read the next table selected in the list
@@ -1109,6 +1130,7 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Node = OpenMaps(iMapTable).Node
 			ProcessSelected(iExtractTot).TableName = OpenMaps(iMapTable).TableName
 			ProcessSelected(iExtractTot).OutputName = OpenMaps(iMapTable).OutputName
+			ProcessSelected(iExtractTot).OutputType = OpenMaps(iMapTable).OutputType
 			ProcessSelected(iExtractTot).TableType = "Map"
 			ProcessSelected(iExtractTot).Partner = Partners(iPartner).Name
 			ProcessSelected(iExtractTot).Short = Partners(iPartner).Short
@@ -1117,14 +1139,13 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Files = Partners(iPartner).MapFiles
 			ProcessSelected(iExtractTot).Columns = OpenMaps(iMapTable).Columns
 			ProcessSelected(iExtractTot).Clauses = OpenMaps(iMapTable).Clauses
+			ProcessSelected(iExtractTot).Macro = OpenMaps(iMapTable).Macro
 
 			'-------------------------------------------------
 			' Read the next table selected in the list
 			'-------------------------------------------------
 			iMapTable = ReadControlValue(3)
 		Loop
-
-		'Redim ProcessSelected(iExtractTot)
 
 		'-------------------------------------------------
 		' Read the next partner selected in the list
@@ -1248,10 +1269,11 @@ Sub ProcessExtracts
 
 	OnError Goto ErrorTrap
 
-	Dim sNodeName, sTableName, sOutputName, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses As String
+	Dim sNodeName, sTableName, sOutputName, sOutputType, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses, sMapMacro As String
 	sNodeName = ProcessSelected(iExtractCnt).Node
 	sTableName = ProcessSelected(iExtractCnt).TableName
 	sOutputName = ProcessSelected(iExtractCnt).OutputName
+	sOutputType = ProcessSelected(iExtractCnt).OutputType
 	sTableType = ProcessSelected(iExtractCnt).TableType
 	sPartnerName = ProcessSelected(iExtractCnt).Partner
 	sShortName = ProcessSelected(iExtractCnt).Short
@@ -1260,6 +1282,21 @@ Sub ProcessExtracts
 	sFiles = ProcessSelected(iExtractCnt).Files
 	sMapColumns = ProcessSelected(iExtractCnt).Columns
 	sMapClauses = ProcessSelected(iExtractCnt).Clauses
+	sMapMacro = ProcessSelected(iExtractCnt).Macro
+
+'	Call MyPrint("sNodeName = " + sNodeName)
+'	Call MyPrint("sTableName = " + sTableName)
+'	Call MyPrint("sOutputName = " + sOutputName)
+'	Call MyPrint("sOutputType = " + sOutputType)
+'	Call MyPrint("sTableType = " + sTableType)
+'	Call MyPrint("sPartnerName = " + sPartnerName)
+'	Call MyPrint("sShortName = " + sShortName)
+'	Call MyPrint("sFormat = " + sFormat)
+'	Call MyPrint("sExport = " + sExport)
+'	Call MyPrint("sFiles = " + sFiles)
+'	Call MyPrint("sMapColumns = " + sMapColumns)
+'	Call MyPrint("sMapClauses = " + sMapClauses)
+'	Call MyPrint("sMapMacro = " + sMapMacro)
 
 	'-------------------------------------------------
 	' If this is a new partner ...
@@ -1318,7 +1355,7 @@ Sub ProcessExtracts
 	If sTableType = "SQL" Then
 		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
-		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sOutputName, sMapColumns, sMapClauses)
+		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sOutputName, sOutputType, sMapColumns, sMapClauses, sMapMacro)
 	End If
 
 	Call MyPrint("Completed process " + iExtractCnt + " of " + iExtractTot + ".")
@@ -1365,6 +1402,8 @@ ErrorTrap:
 	'-------------------------------------------------
 	' Halt processing
 	'-------------------------------------------------
+	Call MyPrint("Error occurred")
+	iExtractCnt = iExtractTot
 	ProgressBar = -1
 
 End Sub
@@ -1383,6 +1422,14 @@ Sub SelectSQL (ByVal nConn As Integer,
 '* intersect with the boundaries where the
 '* partner equals the value passed in the call.
 '*************************************************
+
+'	Call MyPrint("sPartnerName = " + sPartnerName)
+'	Call MyPrint("sShortName = " + sShortName)
+'	Call MyPrint("sFormat = " + sFormat)
+'	Call MyPrint("sExport = " + sExport)
+'	Call MyPrint("sSQLFiles = " + sSQLFiles)
+'	Call MyPrint("iSelectType = " + iSelectType)
+'	Call MyPrint("sTableName = " + sTableName)
 
 	Dim iWaitCount As Integer
 	iWaitCount = 0
@@ -1491,6 +1538,14 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Dim sNodeName, sLocalTable as String
 	For i = 1 to UBound(SQLFiles)
 
+'		Call MyPrint("sNodeName = " + SQLFiles(i).Node)
+'		Call MyPrint("sTableName = " + SQLFiles(i).TableName)	
+'		Call MyPrint("sOutputName = " + SQLFiles(i).OutputName)
+'		Call MyPrint("sOutputType = " + SQLFiles(i).OutputType)
+'		Call MyPrint("sMapColumns = " + SQLFiles(i).Columns)
+'		Call MyPrint("sMapClauses = " + SQLFiles(i).Clauses)
+'		Call MyPrint("sMapMacro = " + SQLFiles(i).Macro)
+
 		'-------------------------------------------------
 		' If this SQL clause is found in the partner
 		' table record then process it, otherwise skip
@@ -1536,17 +1591,16 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' confidential surveys if they are not required
 		'-------------------------------------------------
 		Dim sSQLClause As String
-		If SQLFiles(i).Clauses = "" Then
-			If bConfidentialSurveys = True Or sConfidentialClause = "" Then
-				sSQLClause = ""
-			Else
+		sSQLClause = SQLFiles(i).Clauses
+		If bConfidentialSurveys = False And sConfidentialClause <> "" Then
+			If sSQLClause = "" Then
 				sSQLClause = sConfidentialClause
-			End If
-		Else
-			If bConfidentialSurveys = True Or sConfidentialClause = "" Then
-				sSQLClause = SQLFiles(i).Clauses
 			Else
-				sSQLClause = SQLFiles(i).Clauses & " And " & sConfidentialClause
+				If UCase$(Left$(sSQLClause, 8)) = "GROUP BY" Or UCase$(Left$(sSQLClause, 8)) = "ORDER BY" Then
+					sSQLClause = sConfidentialClause & " " & sSQLClause
+				Else
+					sSQLClause = sConfidentialClause & " And " & sSQLClause
+				End If
 			End If
 		End If
 
@@ -1780,12 +1834,25 @@ LinkTable:
 		End If
 
 		'-------------------------------------------------
-		' Also export the temporary table as a text file if required
+		' Override the export format if required
+		'-------------------------------------------------
+		Dim sExportType As String
+		sExportType = sExport
+		If UCase$(SQLFiles(i).OutputType) = "CSV" Or UCase$(SQLFiles(i).OutputType) = "TXT" Then
+			Call MyPrint("Overriding the export type ...")
+			sExportType = SQLFiles(i).OutputType
+		End If
+
+		'-------------------------------------------------
+		' Export the temporary table as a text file if required
 		'-------------------------------------------------
 ExportTable:
 		OnError Goto ExportError
 		
-		If UCase$(sExport) = "CSV" Then
+		Dim sCmd As String
+
+		If UCase$(sExportType) = "CSV" Then
+
 			Call MyPrint("Exporting as a CSV ...")
 
 			Set ProgressBars Off
@@ -1800,7 +1867,17 @@ ExportTable:
 
 			Set ProgressBars On
 
-		ElseIf UCase$(sExport) = "TXT" Then
+			'-------------------------------------------------
+			' Post-process the export file (if required)
+			'-------------------------------------------------
+			If SQLFiles(i).Macro <> "" Then
+				Call MyPrint("Processing the export file ...")
+				sCmd = "Run Program " + Chr$(34) + "cscript.exe " +  + Chr$(34) + Chr$(34) + SQLFiles(i).Macro + Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalPath
+					+ Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
+				Run Command (sCmd)
+			End If
+
+		ElseIf UCase$(sExportType) = "TXT" Then
 
 			Call MyPrint("Exporting as a TXT ...")
 
@@ -1811,20 +1888,38 @@ ExportTable:
 				Type "ASCII"
 				Delimiter ","
 				CharSet "WindowsLatin1"
-				Titles
-
 				Overwrite
 
 			Set ProgressBars On
+
+			'-------------------------------------------------
+			' Post-process the export file (if required)
+			'-------------------------------------------------
+			If SQLFiles(i).Macro <> "" Then
+				Call MyPrint("Processing the export file ...")
+				sCmd = "Run Program " + Chr$(34) + "cscript.exe " +  + Chr$(34) + Chr$(34) + SQLFiles(i).Macro + Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalPath
+					+ Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
+				Run Command (sCmd)
+			End If
 
 		End If
 
 		OnError Goto ErrorTrap
 
 		'-------------------------------------------------
+		' Override the output format if required
+		'-------------------------------------------------
+		Dim sOutputType As String
+		sOutputType = sFormat
+		If UCase$(SQLFiles(i).OutputType) = "TAB" Or UCase$(SQLFiles(i).OutputType) = "SHP" Or UCase$(SQLFiles(i).OutputType) = "BOTH" Then
+			Call MyPrint("Overriding the output type ...")
+			sOutputType = SQLFiles(i).OutputType
+		End If
+
+		'-------------------------------------------------
 		' Translate the table to ESRI shapefile if required
 		'-------------------------------------------------
-		If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
+		If UCase$(sOutputType) = "SHP" Or UCase$(sOutputType) = "BOTH" Then
 			Dim sLogFilePath As String, sLogFileShp As String
 			sLogFilePath = PathToDirectory$(sLogFileName)
 			sLogFileShp = "TabToShp" + "_" + sUserID
@@ -1837,7 +1932,7 @@ ExportTable:
 		'-------------------------------------------------
 		' If the partner requires a MapInfo table
 		'-------------------------------------------------
-		If UCase$(sFormat) = "TAB" Or UCase$(sFormat) = "BOTH" Then
+		If UCase$(sOutputType) = "TAB" Or UCase$(sOutputType) = "BOTH" Then
 		
 			'-------------------------------------------------
 			' Check if the local table is mappable (i.e.
@@ -1866,7 +1961,6 @@ ExportTable:
 					'-------------------------------------------------
 					Call SetSymbology(sNodeName, sLocalTable, sShortName)
 
-					Dim sCmd As String
 					sCmd = "Commit Table " + sTableAlias
 					Run Command (sCmd)
 
@@ -2071,7 +2165,7 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 						Dim sSQLClause As String
 						sSQLClause = sClause
 						If sSQLClause <> "" Then
-							sSQLClause = " And " & sClause
+							sSQLClause = " And " & sSQLClause
 						End If
 
 						'-------------------------------------------------
@@ -2199,14 +2293,29 @@ Sub SelectMaps (sPartnerName As String,
 	sNodeName as String,
 	sTableName As String,
 	sOutputName As String,
+	sOutputType As String,
 	sMapColumns As String,
-	sMapClauses As String)
+	sMapClauses As String,
+	sMapMacro As String)
 '*************************************************
 '* Routine to select the records from the
 '* MapInfo table name passed in the call that
 '* intersect with the boundaries where the
 '* partner equals the value passed in the call.
 '*************************************************
+
+'	Call MyPrint("sPartnerName = " + sPartnerName)
+'	Call MyPrint("sShortName = " + sShortName)
+'	Call MyPrint("sFormat = " + sFormat)
+'	Call MyPrint("sExport = " + sExport)
+'	Call MyPrint("sMapFiles = " + sMapFiles)
+'	Call MyPrint("sNodeName = " + sNodeName)
+'	Call MyPrint("sTableName = " + sTableName)
+'	Call MyPrint("sOutputName = " + sOutputName)
+'	Call MyPrint("sOutputType = " + sOutputType)
+'	Call MyPrint("sMapColumns = " + sMapColumns)
+'	Call MyPrint("sMapClauses = " + sMapClauses)
+'	Call MyPrint("sMapMacro = " + sMapMacro)
 
 	Dim iWaitCount As Integer
 	iWaitCount = 0
@@ -2224,7 +2333,7 @@ Sub SelectMaps (sPartnerName As String,
 		UCase$(sFormat) <> "TAB" And
 		UCase$(sFormat) <> "BOTH") Or
 		sMapFiles = "") Then
-		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
+		Call MyPrint("Skipping table = '" + sNodeName + "' - not required.")
 		Exit Sub
 	End If
 
@@ -2233,11 +2342,11 @@ Sub SelectMaps (sPartnerName As String,
 	' table record then process it, otherwise skip it
 	'-------------------------------------------------
 	If Instr(1, Ucase$(sMapFiles), Ucase$(sNodeName)) = 0 then
-		Call MyPrint("Skipping table = '" + sTableName + "' - not required.")
+		Call MyPrint("Skipping table = '" + sNodeName + "' - not required.")
 		Exit Sub
 	End If
 
-	Call MyPrint("Processing table = '" + sTableName + "' ...")
+	Call MyPrint("Processing table = '" + sNodeName + "' ...")
 
 	'-------------------------------------------------
 	' Setup the temporary and local table names
@@ -2282,10 +2391,13 @@ Sub SelectMaps (sPartnerName As String,
 	Call MyPrint("Executing spatial selection ...")
 	Dim sCmd As String
 	Dim sWhereClause As string
-	If sMapClauses = "" Then
-		sWhereClause = ""
-	Else
-		sWhereClause = " And " + sMapClauses
+
+	If sMapClauses <> "" Then
+		If UCase$(Left$(sMapClauses, 8)) = "GROUP BY" Or UCase$(Left$(sMapClauses, 8)) = "ORDER BY" Then
+			sWhereClause = sMapClauses
+		Else
+			sWhereClause = " And " + sMapClauses
+		End If
 	End If
 	
 SelectRecords:
@@ -2359,9 +2471,19 @@ ExportTable:
 	OnError Goto ExportError
 	
 	'-------------------------------------------------
-	' Also export the table as a text file if required
+	' Override the export format if required
 	'-------------------------------------------------
-		If UCase$(sExport) = "CSV" Then
+	Dim sExportType As String
+	sExportType = sExport
+	If sOutputType <> "" Then
+		Call MyPrint("Overriding the export type with '" & sOutputType & "' ...")
+		sExportType = sOutputType
+	End If
+
+	'-------------------------------------------------
+	' Export the table as a text file if required
+	'-------------------------------------------------
+		If UCase$(sExportType) = "CSV" Then
 
 			Call MyPrint("Exporting as a CSV ...")
 
@@ -2377,7 +2499,17 @@ ExportTable:
 
 			Set ProgressBars On
 
-		ElseIf UCase$(sExport) = "TXT" Then
+			'-------------------------------------------------
+			' Post-process the export file (if required)
+			'-------------------------------------------------
+			If sMapMacro <> "" Then
+				Call MyPrint("Processing the export file ...")
+				sCmd = "Run Program " + Chr$(34) + "cscript.exe " +  + Chr$(34) + Chr$(34) + sMapMacro + Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalPath
+					+ Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
+				Run Command (sCmd)
+			End If
+
+		ElseIf UCase$(sExportType) = "TXT" Then
 
 			Call MyPrint("Exporting as a TXT ...")
 
@@ -2388,19 +2520,38 @@ ExportTable:
 				Type "ASCII"
 				Delimiter ","
 				CharSet "WindowsLatin1"
-				Titles
 				Overwrite
 
 			Set ProgressBars On
+
+			'-------------------------------------------------
+			' Post-process the export file (if required)
+			'-------------------------------------------------
+			If sMapMacro <> "" Then
+				Call MyPrint("Processing the export file ...")
+				sCmd = "Run Program " + Chr$(34) + "cscript.exe " +  + Chr$(34) + Chr$(34) + sMapMacro + Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalPath
+					+ Chr$(34) + Chr$(34) + " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
+				Run Command (sCmd)
+			End If
 
 		End If
 
 	OnError Goto ErrorTrap
 
 	'-------------------------------------------------
+	' Override the output format if required
+	'-------------------------------------------------
+	Dim sFormatType As String
+	sFormatType = sFormat
+	If sOutputType <> "" Then
+		Call MyPrint("Overriding the output type with '" & sOutputType & "' ...")
+		sFormatType = sOutputType
+	End If
+
+	'-------------------------------------------------
 	' Translate the table to ESRI shapefile if required
 	'-------------------------------------------------
-	If UCase$(sFormat) = "SHP" Or UCase$(sFormat) = "BOTH" Then
+	If UCase$(sFormatType) = "SHP" Or UCase$(sFormatType) = "BOTH" Then
 		Dim sLogFilePath As String, sLogFileShp As String
 		sLogFilePath = PathToDirectory$(sLogFileName)
 		sLogFileShp = "TabToShp" + "_" + sUserID
@@ -2411,7 +2562,7 @@ ExportTable:
 	'-------------------------------------------------
 	' If the partner requires a MapInfo table
 	'-------------------------------------------------
-	If UCase$(sFormat) = "TAB" Or UCase$(sFormat) = "BOTH" Then
+	If UCase$(sFormatType) = "TAB" Or UCase$(sFormatType) = "BOTH" Then
 		'-------------------------------------------------
 		' Check if the local table is open and close it
 		'-------------------------------------------------
@@ -2456,7 +2607,6 @@ ExportError:
 	Goto ErrorTrap
 
 ErrorTrap:
-
 
 	'-------------------------------------------------
 	' Exit if we've already waited 20 seconds

@@ -32,11 +32,11 @@ Include "MapBasic.def"
 Include "Menu.def"
 Include "Icons.def"
 
-'Include "XMLMenu32.def"
+Include "XMLMenu32.def"
 
-Include "IMapInfoPro.def"
-Include "Enums.def"
-Include "XMLMenu64.def"
+'Include "IMapInfoPro.def"
+'Include "Enums.def"
+'Include "XMLMenu64.def"
 
 '-------------------------------------------------
 ' Define the custom variable types
@@ -73,16 +73,20 @@ Type FileDetails
 	Node As String
 	TableName As String
 	OutputName As String
+	OutputType As String
 	Columns As String
 	Clauses As String
+	Macro As String
 End Type
 
 Type MapDetails
 	Node As String
 	TableName As String
 	OutputName As String
+	OutputType As String
 	Columns As String
 	Clauses As String
+	Macro As String
 End Type
 
 Type PartnerDetails
@@ -99,6 +103,7 @@ Type ProcessDetails
 	Node As String
 	TableName As String
 	OutputName As String
+	OutputType As String
 	TableType As String
 	Partner As String
 	Short As String
@@ -107,6 +112,7 @@ Type ProcessDetails
 	Files As String
 	Columns As String
 	Clauses As String
+	Macro As String
 End Type
 
 '-------------------------------------------------
@@ -150,8 +156,10 @@ Declare Sub SelectMaps
 	sNodeName as String,
 	sTableName As String,
 	sOutputName As String,
+	sOutputType As String,
 	sMapColumns As String,
-	sMapClauses As String)
+	sMapClauses As String,
+	sMapMacro As String)
 Declare Sub AboutBox
 Declare Sub egsit
 Declare Sub MyPrint
