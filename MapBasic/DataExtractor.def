@@ -139,8 +139,7 @@ Declare Sub SelectSQL
 	sTableName As String)
 Declare Sub SetSymbology
 	(sNodeName As String,
-	sTableName As String,
-	sShortName As String)
+	sTableName As String)
 Declare Sub SelectMaps
 	(sPartnerName As String,
 	sShortName As String,

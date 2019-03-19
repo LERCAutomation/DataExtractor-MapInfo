@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.25
+'* DataExtractor v1.5.26
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,11 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - January 2019
+'* Last revised:    Andy Foy - February 2019
+'*
+'* *****************  Version 1.5.26  ***************
+'* Author: Andy Foy		Date: 19/03/2019
+'* A. Enable SQL output file names to contain spaces.
 '*
 '* *****************  Version 1.5.25  ***************
 '* Author: Andy Foy		Date: 16/01/2019
@@ -183,7 +187,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.25"
+	sVersion = "1.5.26"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1504,6 +1508,15 @@ Sub SelectSQL (ByVal nConn As Integer,
 		End If
 
 		'-------------------------------------------------
+		' Set the local path and temporary table names
+		'-------------------------------------------------
+		Dim sLocalPath, sTempTable As String
+		sLocalPath = sDefaultPath + "\" + sShortName
+
+		sTempTable = Left$("T" + sSQLTable + "_" + sShortName, 31)
+		sTempTable = StringReplace(sTempTable, " ", "_")
+
+		'-------------------------------------------------
 		' Replace any variables
 		'-------------------------------------------------
 		sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
@@ -1514,19 +1527,12 @@ Sub SelectSQL (ByVal nConn As Integer,
 		sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
 
 		'-------------------------------------------------
-		' Check if the output name is not too long
+		' Check if the output name is too long
 		'-------------------------------------------------
 		If Len(sLocalTable) > 31 Then
 			Call MyPrint("Output name '" + sLocalTable + "' too long - name truncated.")
 			sLocalTable = Left$(sLocalTable, 31)
 		End If
-
-		'-------------------------------------------------
-		' Setup the temporary and local table names
-		'-------------------------------------------------
-		Dim sLocalPath, sTempTable As String
-		sLocalPath = sDefaultPath + "\" + sShortName
-		sTempTable = Left$("T" + sLocalTable + "_" + sShortName, 31)
 
 		Call MyPrint("")
 		Call MyPrint("Extracting '" + sLocalTable + "' ...")
@@ -1556,6 +1562,11 @@ Sub SelectSQL (ByVal nConn As Integer,
 			Call MyPrint("Where clause is ... " + sSQLClause)
 			sSQLClause = "Where " & sSQLClause
 		End If
+
+		Dim sSQLColumns As String
+		sSQLColumns = SQLFiles(i).Columns
+
+		Call MyPrint("Columns clause is ... " + sSQLColumns)
 
 		'-------------------------------------------------
 		' Count the number of records that have been
@@ -1612,7 +1623,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' temporary table (to check the record length)
 		'-------------------------------------------------
 		Dim sSQLStmt As String
-		sSQLStmt = "Select Top(0) " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
+		sSQLStmt = "Select Top(0) " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
 
 		'-------------------------------------------------
 		' Link the SQL table as a temporary table
@@ -1621,13 +1632,18 @@ LinkTemp:
 		OnError Goto TempError
 		
 		Call MyPrint("Linking dummy table ...")
-		Server nConn Link Table
-		sSQLStmt
-		Toolkit "ODBC"
-		Into sTempTable
-		File sLocalPath + "\" + sLocalTable
-		Autokey Off
-		ReadOnly
+		
+'		Server nConn Link Table
+'		sSQLStmt
+'		Toolkit "ODBC"
+'		Into sTempTable
+'		File sLocalPath + "\" + sLocalTable
+'		Autokey Off
+'		ReadOnly
+
+		Dim sCmd As String
+		sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sLocalPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
+		Run Command (sCmd)
 
 		OnError Goto ErrorTrap
 
@@ -1720,7 +1736,7 @@ LinkTemp:
 		' Set up the SQL statement for extracting from
 		' the temporary table
 		'-------------------------------------------------
-		sSQLStmt = "Select " + SQLFiles(i).Columns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
+		sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
 
 		'-------------------------------------------------
 		' Link the SQL table as a temporary table
@@ -1729,13 +1745,17 @@ LinkTable:
 		OnError Goto LinkError
 		
 		Call MyPrint("Linking temporary table ...")
-		Server nConn Link Table
-		sSQLStmt
-		Toolkit "ODBC"
-		Into sTempTable
-		File sLocalPath + "\" + sLocalTable
-		Autokey Off
-		ReadOnly
+		
+'		Server nConn Link Table
+'		sSQLStmt
+'		Toolkit "ODBC"
+'		Into sTempTable
+'		File sLocalPath + "\" + sLocalTable
+'		Autokey Off
+'		ReadOnly
+
+		sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sLocalPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
+		Run Command (sCmd)
 
 		OnError Goto ErrorTrap
 
@@ -1864,9 +1884,9 @@ ExportTable:
 					'-------------------------------------------------
 					' Set the symbology for the table before closing
 					'-------------------------------------------------
-					Call SetSymbology(sNodeName, sLocalTable, sShortName)
+					Call SetSymbology(sNodeName, sTableAlias)
 
-					Dim sCmd As String
+					'Dim sCmd As String
 					sCmd = "Commit Table " + sTableAlias
 					Run Command (sCmd)
 
@@ -1970,7 +1990,7 @@ ErrorTrap:
 
 End Sub
 
-Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As String)
+Sub SetSymbology(sNodeName as String, sTableName As String)
 '***************************************************************
 '* Retrieve the symbology styles and clauses from the config file
 '* which is a XML document
@@ -1987,12 +2007,6 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 	Dim hXMLSymbolNode As MIXmlNode
 
 	OnError Goto GetSymbologyError
-
-	'-------------------------------------------------
-	' Setup the temporary and local table names
-	'-------------------------------------------------
-	Dim sTempTable As String
-	sTempTable = Left$(sLocalTable + "_" + sShortName, 31)
 
 	'-------------------------------------------------
 	' Create a document handle
@@ -2085,7 +2099,7 @@ Sub SetSymbology(sNodeName as String, sLocalTable As String, sShortName As Strin
 						' matching the required SQL clause
 						'-------------------------------------------------
 						Dim sCmd As String
-						sCmd = "Select * From " + sTempTable + " Where Str$(obj) = """ + sObject + """ " + sSQLClause + " Into NewStyle NoSelect"
+						sCmd = "Select * From " + sTableName + " Where Str$(obj) = """ + sObject + """ " + sSQLClause + " Into NewStyle NoSelect"
 						Run Command (sCmd)
 
 						'-------------------------------------------------
@@ -2240,13 +2254,15 @@ Sub SelectMaps (sPartnerName As String,
 	Call MyPrint("Processing table = '" + sTableName + "' ...")
 
 	'-------------------------------------------------
-	' Setup the temporary and local table names
+	' Set the local and temporary table names
 	'-------------------------------------------------
 	Dim sLocalPath, sLocalTable, sTempTable As String
 	sLocalPath = sDefaultPath + "\" + sShortName
 	sLocalTable = sOutputName
+	
 	sTempTable = Left$("T" + sTableName + "_" + sShortName, 31)
-
+	sTempTable = StringReplace(sTempTable, " ", "_")
+	
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
@@ -2258,7 +2274,7 @@ Sub SelectMaps (sPartnerName As String,
 	sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
 	
 	'-------------------------------------------------
-	' Check if the output name is not too long
+	' Check if the output name is too long
 	'-------------------------------------------------
 	If Len(sLocalTable) > 31 Then
 		Call MyPrint("Output name '" + sLocalTable + "' too long - name truncated.")
@@ -2267,6 +2283,15 @@ Sub SelectMaps (sPartnerName As String,
 
 	'-------------------------------------------------
 	' Check if the local table is already/still open
+	' and close it if it is
+	'-------------------------------------------------
+	If TableIsOpen(sLocalTable) Then
+		Call MyPrint("Closing local table ...")
+		Close Table sLocalTable
+	End If
+
+	'-------------------------------------------------
+	' Check if the temporary table is already/still open
 	' and close it if it is
 	'-------------------------------------------------
 	If TableIsOpen(sTempTable) Then
