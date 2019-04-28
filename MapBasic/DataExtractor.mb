@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.29
+'* DataExtractor v1.5.30
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,6 +29,10 @@
 '*
 '* Created:         Andy Foy - November 2012
 '* Last revised:    Andy Foy - April 2019
+'*
+'* *****************  Version 1.5.30  ***************
+'* Author: Andy Foy		Date: 28/04/2019
+'* A. Add separate clause for ORDER BY and GROUP BY.
 '*
 '* *****************  Version 1.5.29  ***************
 '* Author: Andy Foy		Date: 16/04/2019
@@ -203,7 +207,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.29"
+	sVersion = "1.5.30"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -458,7 +462,10 @@ Sub GetDefaultValues
 						SQLFiles(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
 
 						' SQL clause used to retrieve the required rows from the temporary SQL table
-						SQLFiles(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clauses")
+						SQLFiles(i).WhereClause = GetSingleNodeValue(hXMLFilesNode, "WhereClause")
+						
+						' SQL clause used to order and group the required rows from the temporary SQL table
+						SQLFiles(i).OrderClause = GetSingleNodeValue(hXMLFilesNode, "OrderClause")
 						
 						' Macro/Script to call to format the extract of the map table
 						SQLFiles(i).Macro = GetSingleNodeValue(hXMLFilesNode, "Macro")
@@ -466,10 +473,10 @@ Sub GetDefaultValues
 						' Parameter to pass to Macro/Script
 						SQLFiles(i).MacroParm = GetSingleNodeValue(hXMLFilesNode, "MacroParm")
 
-						' Remove CR, LF and Tab chars
-						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(10), "")
-						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(13), "")
-						SQLFiles(i).Clauses = StringReplace(SQLFiles(i).Clauses, chr$(9), "")
+						' Remove any CR, LF and Tab chars
+						SQLFiles(i).WhereClause = StringReplace(SQLFiles(i).WhereClause, chr$(10), "")
+						SQLFiles(i).WhereClause = StringReplace(SQLFiles(i).WhereClause, chr$(13), "")
+						SQLFiles(i).WhereClause = StringReplace(SQLFiles(i).WhereClause, chr$(9), "")
 
 						'-------------------------------------------------
 						' Get a handle on the next attribute in the node list
@@ -523,7 +530,10 @@ Sub GetDefaultValues
 						AllMaps(i).Columns = GetSingleNodeValue(hXMLFilesNode, "Columns")
 
 						' SQL clause used to retrieve the required rows from the loaded map table
-						AllMaps(i).Clauses = GetSingleNodeValue(hXMLFilesNode, "Clause")
+						AllMaps(i).WhereClause = GetSingleNodeValue(hXMLFilesNode, "WhereClause")
+
+						' SQL clause used to order the required rows from the loaded map table
+						AllMaps(i).OrderClause = GetSingleNodeValue(hXMLFilesNode, "OrderClause")
 
 						' Macro/Script to call to format the extract of the map table
 						AllMaps(i).Macro = GetSingleNodeValue(hXMLFilesNode, "Macro")
@@ -531,10 +541,10 @@ Sub GetDefaultValues
 						' Parameter to pass to Macro/Script
 						AllMaps(i).MacroParm = GetSingleNodeValue(hXMLFilesNode, "MacroParm")
 
-						' Remove CR, LF and Tab chars
-						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(10), "")
-						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(13), "")
-						AllMaps(i).Clauses = StringReplace(AllMaps(i).Clauses, chr$(9), "")
+						' Remove any CR, LF and Tab chars
+						AllMaps(i).WhereClause = StringReplace(AllMaps(i).WhereClause, chr$(10), "")
+						AllMaps(i).WhereClause = StringReplace(AllMaps(i).WhereClause, chr$(13), "")
+						AllMaps(i).WhereClause = StringReplace(AllMaps(i).WhereClause, chr$(9), "")
 
 						'-------------------------------------------------
 						' Get a handle on the next attribute in the node list
@@ -912,7 +922,8 @@ Sub DialogSetup
 			OpenMaps(j).OutputName = AllMaps(i).OutputName
 			OpenMaps(j).OutputType = AllMaps(i).OutputType
 			OpenMaps(j).Columns = AllMaps(i).Columns
-			OpenMaps(j).Clauses = AllMaps(i).Clauses
+			OpenMaps(j).WhereClause = AllMaps(i).WhereClause
+			OpenMaps(j).OrderClause = AllMaps(i).OrderClause
 			OpenMaps(j).Macro = AllMaps(i).Macro
 			OpenMaps(j).MacroParm = AllMaps(i).MacroParm
 		Else
@@ -1132,7 +1143,8 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Exports = Partners(iPartner).Exports
 			ProcessSelected(iExtractTot).Files = Partners(iPartner).SQLFiles
 			ProcessSelected(iExtractTot).Columns = ""
-			ProcessSelected(iExtractTot).Clauses = ""
+			ProcessSelected(iExtractTot).WhereClause = ""
+			ProcessSelected(iExtractTot).OrderClause = ""
 			ProcessSelected(iExtractTot).Macro = ""
 			ProcessSelected(iExtractTot).MacroParm = ""
 
@@ -1159,7 +1171,8 @@ Sub CheckSelection
 			ProcessSelected(iExtractTot).Exports = Partners(iPartner).Exports
 			ProcessSelected(iExtractTot).Files = Partners(iPartner).MapFiles
 			ProcessSelected(iExtractTot).Columns = OpenMaps(iMapTable).Columns
-			ProcessSelected(iExtractTot).Clauses = OpenMaps(iMapTable).Clauses
+			ProcessSelected(iExtractTot).WhereClause = OpenMaps(iMapTable).WhereClause
+			ProcessSelected(iExtractTot).OrderClause = OpenMaps(iMapTable).OrderClause
 			ProcessSelected(iExtractTot).Macro = OpenMaps(iMapTable).Macro
 			ProcessSelected(iExtractTot).MacroParm = OpenMaps(iMapTable).MacroParm
 
@@ -1291,7 +1304,7 @@ Sub ProcessExtracts
 
 	OnError Goto ErrorTrap
 
-	Dim sNodeName, sTableName, sOutputName, sOutputType, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapClauses, sMapMacro, sMapMacroParm As String
+	Dim sNodeName, sTableName, sOutputName, sOutputType, sTableType, sPartnerName, sShortName, sFormat, sExport, sFiles, sMapColumns, sMapWhereClause, sMapOrderClause, sMapMacro, sMapMacroParm As String
 	sNodeName = ProcessSelected(iExtractCnt).Node
 	sTableName = ProcessSelected(iExtractCnt).TableName
 	sOutputName = ProcessSelected(iExtractCnt).OutputName
@@ -1303,7 +1316,8 @@ Sub ProcessExtracts
 	sExport = ProcessSelected(iExtractCnt).Exports
 	sFiles = ProcessSelected(iExtractCnt).Files
 	sMapColumns = ProcessSelected(iExtractCnt).Columns
-	sMapClauses = ProcessSelected(iExtractCnt).Clauses
+	sMapWhereClause = ProcessSelected(iExtractCnt).WhereClause
+	sMapOrderClause = ProcessSelected(iExtractCnt).OrderClause
 	sMapMacro = ProcessSelected(iExtractCnt).Macro
 	sMapMacroParm = ProcessSelected(iExtractCnt).MacroParm
 
@@ -1318,7 +1332,8 @@ Sub ProcessExtracts
 '	Call MyPrint("sExport = " + sExport)
 '	Call MyPrint("sFiles = " + sFiles)
 '	Call MyPrint("sMapColumns = " + sMapColumns)
-'	Call MyPrint("sMapClauses = " + sMapClauses)
+'	Call MyPrint("sMapWhereClause = " + sMapWhereClause)
+'	Call MyPrint("sMapOrderClause = " + sMapOrderClause)
 '	Call MyPrint("sMapMacro = " + sMapMacro)
 '	Call MyPrint("sMapMacroParm = " + sMapMacroParm)
 
@@ -1379,7 +1394,7 @@ Sub ProcessExtracts
 	If sTableType = "SQL" Then
 		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
-		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sOutputName, sOutputType, sMapColumns, sMapClauses, sMapMacro, sMapMacroParm)
+		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sOutputName, sOutputType, sMapColumns, sMapWhereClause, sMapOrderClause, sMapMacro, sMapMacroParm)
 	End If
 
 	Call MyPrint("Completed process " + iExtractCnt + " of " + iExtractTot + ".")
@@ -1566,10 +1581,11 @@ Sub SelectSQL (ByVal nConn As Integer,
 '		Call MyPrint("sTableName = " + SQLFiles(i).TableName)	
 '		Call MyPrint("sOutputName = " + SQLFiles(i).OutputName)
 '		Call MyPrint("sOutputType = " + SQLFiles(i).OutputType)
-'		Call MyPrint("sMapColumns = " + SQLFiles(i).Columns)
-'		Call MyPrint("sMapClauses = " + SQLFiles(i).Clauses)
-'		Call MyPrint("sMapMacro = " + SQLFiles(i).Macro)
-'		Call MyPrint("sMapMacroParm = " + SQLFiles(i).MacroParm)
+'		Call MyPrint("sSQLColumns = " + SQLFiles(i).Columns)
+'		Call MyPrint("sSQLWhereClause = " + SQLFiles(i).WhereClause)
+'		Call MyPrint("sSQLOrderClause = " + SQLFiles(i).OrderClause)
+'		Call MyPrint("sSQLMacro = " + SQLFiles(i).Macro)
+'		Call MyPrint("sSQLMacroParm = " + SQLFiles(i).MacroParm)
 
 		'-------------------------------------------------
 		' If this SQL clause is found in the partner
@@ -1614,40 +1630,47 @@ Sub SelectSQL (ByVal nConn As Integer,
 		Call MyPrint("Extracting '" + sLocalTable + "' ...")
 
 		'-------------------------------------------------
-		' Set the SQL clause, excluding any
-		' confidential surveys if they are not required
+		' Set the SQL columns
 		'-------------------------------------------------
-		Dim sSQLClause As String
-		sSQLClause = SQLFiles(i).Clauses
-		If bConfidentialSurveys = False And sConfidentialClause <> "" Then
-			If sSQLClause = "" Then
-				sSQLClause = sConfidentialClause
-			Else
-				If UCase$(Left$(sSQLClause, 8)) = "GROUP BY" Or UCase$(Left$(sSQLClause, 8)) = "ORDER BY" Then
-					sSQLClause = sConfidentialClause & " " & sSQLClause
-				Else
-					sSQLClause = sConfidentialClause & " And " & sSQLClause
-				End If
-			End If
-		End If
-
-	    If sSQLClause = "" Then
-	        Call MyPrint("No where clause was used")
-       	Else
-			Call MyPrint("Where clause is ... " + sSQLClause)
-			sSQLClause = "Where " & sSQLClause
-		End If
-
 		Dim sSQLColumns As String
 		sSQLColumns = SQLFiles(i).Columns
 
 		Call MyPrint("Columns clause is ... " + sSQLColumns)
 
 		'-------------------------------------------------
+		' Set the SQL where clause, excluding any
+		' confidential surveys if they are not required
+		'-------------------------------------------------
+		Dim sSQLWhereClause As String
+		sSQLWhereClause = SQLFiles(i).WhereClause
+		If bConfidentialSurveys = False And sConfidentialClause <> "" Then
+			If sSQLWhereClause = "" Then
+				sSQLWhereClause = sConfidentialClause
+			Else
+				sSQLWhereClause = sConfidentialClause & " And " & sSQLWhereClause
+			End If
+		End If
+
+	    If sSQLWhereClause = "" Then
+	        Call MyPrint("No where clause was used")
+       	Else
+			Call MyPrint("Where clause is ... " + sSQLWhereClause)
+			sSQLWhereClause = "Where " & sSQLWhereClause
+		End If
+
+		'-------------------------------------------------
+		' Set the SQL group by and order by clause
+		'-------------------------------------------------
+		Dim sSQLOrderClause As String
+		sSQLOrderClause = SQLFiles(i).OrderClause
+
+		Call MyPrint("Order by clause is ... " + sSQLOrderClause)
+
+		'-------------------------------------------------
 		' Count the number of records that have been
 		' selected in the output temporary table
 		'-------------------------------------------------
-		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause)
+		nStmt2 = Server_Execute(nConn, "Select Count(*) As Records From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause)
 		Server nStmt2 Bind Column 1 To iRecTotal, iRecStatus
 		Server nStmt2 Fetch Next
 
@@ -1698,7 +1721,7 @@ Sub SelectSQL (ByVal nConn As Integer,
 		' temporary table (to check the record length)
 		'-------------------------------------------------
 		Dim sSQLStmt As String
-		sSQLStmt = "Select Top(0) " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
+		sSQLStmt = "Select Top(0) " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause
 
 		'-------------------------------------------------
 		' Link the SQL table as a temporary table
@@ -1811,7 +1834,7 @@ LinkTemp:
 		' Set up the SQL statement for extracting from
 		' the temporary table
 		'-------------------------------------------------
-		sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLClause
+		sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause + " " + sSQLOrderClause
 
 		'-------------------------------------------------
 		' Link the SQL table as a temporary table
@@ -2338,7 +2361,8 @@ Sub SelectMaps (sPartnerName As String,
 	sOutputName As String,
 	sOutputType As String,
 	sMapColumns As String,
-	sMapClauses As String,
+	sMapWhereClause As String,
+	sMapOrderClause As String,
 	sMapMacro As String,
 	sMapMacroParm As String)
 '*************************************************
@@ -2358,7 +2382,8 @@ Sub SelectMaps (sPartnerName As String,
 '	Call MyPrint("sOutputName = " + sOutputName)
 '	Call MyPrint("sOutputType = " + sOutputType)
 '	Call MyPrint("sMapColumns = " + sMapColumns)
-'	Call MyPrint("sMapClauses = " + sMapClauses)
+'	Call MyPrint("sMapWhereClause = " + sMapWhereClauses)
+'	Call MyPrint("sMapOrderClause = " + sMapOrderClauses)
 '	Call MyPrint("sMapMacro = " + sMapMacro)
 '	Call MyPrint("sMapMacroParm = " + sMapMacroParm)
 
@@ -2437,20 +2462,15 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	Call MyPrint("Executing spatial selection ...")
 	Dim sCmd As String
-	Dim sWhereClause As string
 
-	If sMapClauses <> "" Then
-		If UCase$(Left$(sMapClauses, 8)) = "GROUP BY" Or UCase$(Left$(sMapClauses, 8)) = "ORDER BY" Then
-			sWhereClause = sMapClauses
-		Else
-			sWhereClause = " And " + sMapClauses
-		End If
+	If sMapWhereClause <> "" Then
+		sMapWhereClause = " And " + sMapWhereClause
 	End If
 	
 SelectRecords:
 	OnError Goto SelectError
 	
-	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sWhereClause + " Into " + sTempTable + " NoSelect"
+	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 	Run Command (sCmd)
 
 	OnError Goto ErrorTrap
