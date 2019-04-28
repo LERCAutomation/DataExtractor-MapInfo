@@ -1,0 +1,15 @@
+(mimenu64.mb:47) Invalid Sub procedure name: RegisterUriParser.  Too many errors.  Error information has been lost.
+(mimenu64.mb:68) Unrecognized command: (.  Too many errors.  Error information has been lost.
+(mimenu64.mb:74) Unrecognized command: (.  Too many errors.  Error information has been lost.
+(mimenu64.mb:80) Unrecognized command: (.  Too many errors.  Error information has been lost.
+(mimenu64.mb:96) Invalid Sub procedure name: SetRbnBtnCtrlCallingHandler.  Too many errors.  Error information has been lost.
+(mimenu64.mb:102) Unrecognized command: (.  Too many errors.  Error information has been lost.
+(mimenu64.mb:103) Invalid Sub procedure name: SetMIRbnToolTipToolTipDescripti.  Too many errors.  Error information has been lost.
+(mimenu64.mb:104) Invalid Sub procedure name: SetMIRbnToolTipToolTipText.  Too many errors.  Error information has been lost.
+(mimenu64.mb:106) Invalid Sub procedure name: SetRbnBtnCtrlToolTip.  Too many errors.  Error information has been lost.
+(mimenu64.mb:111) Invalid Sub procedure name: SetRbnBtnCtrlSmallIcon.  Too many errors.  Error information has been lost.
+(mimenu64.mb:112) Invalid Sub procedure name: SetRbnBtnCtrlLargeIcon.  Too many errors.  Error information has been lost.
+(mimenu64.mb:113) Invalid Sub procedure name: SetRbnBtnCtrlIsLarge.  Too many errors.  Error information has been lost.
+(mimenu64.mb:144) No prototype declared for Sub procedure or Function EndHandler.  Too many errors.  Error information has been lost.
+(mimenu64.mb:148) Unrecognized command: (.  Too many errors.  Error information has been lost.
+(mimenu64.mb:165) No prototype declared for Sub procedure or Function AddIn_About.  Too many errors.  Error information has been lost.
