@@ -28,7 +28,11 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - April 2019
+'* Last revised:    Andy Foy - May 2019
+'*
+'* *****************  Version 1.5.31  ***************
+'* Author: Andy Foy		Date: 28/05/2019
+'* A. Extract all records if spatial geometry is null.
 '*
 '* *****************  Version 1.5.30  ***************
 '* Author: Andy Foy		Date: 28/04/2019
@@ -207,7 +211,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.30"
+	sVersion = "1.5.31"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -2455,23 +2459,54 @@ Sub SelectMaps (sPartnerName As String,
 		Close Table sTempTable
 	End If
 
-	'-------------------------------------------------
-	' Execute the SQL statement to select the table
-	' records intersecting with the required
-	' partner boundary
-	'-------------------------------------------------
-	Call MyPrint("Executing spatial selection ...")
-	Dim sCmd As String
-
-	If sMapWhereClause <> "" Then
-		sMapWhereClause = " And " + sMapWhereClause
-	End If
-	
 SelectRecords:
 	OnError Goto SelectError
-	
-	sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
+
+	'-------------------------------------------------
+	' Check if the partner has a spatial boundary
+	'-------------------------------------------------
+	Dim sCmd As String
+	sCmd = "Select * From " + sPartnerTable + " Where not obj Into " + sTempTable + " NoSelect"
 	Run Command (sCmd)
+	
+	Dim iNonSpatialRecs As Integer
+	iNonSpatialRecs = TableInfo(sTempTable, TAB_INFO_NROWS)
+	
+	If iNonSpatialRecs > 0 Then
+		Call MyPrint("Partner boundary is non-spatial.")
+		If TableIsOpen(sTempTable) Then
+			Close Table sTempTable
+		End If
+	End If
+	
+	If iNonSpatialRecs = 0 Then
+		'-------------------------------------------------
+		' Execute the SQL statement to select the table
+		' records intersecting with the required
+		' partner boundary
+		'-------------------------------------------------
+		Call MyPrint("Executing spatial selection ...")
+
+		If sMapWhereClause <> "" Then
+			sMapWhereClause = " And " + sMapWhereClause
+		End If
+	
+		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
+		Run Command (sCmd)
+	Else
+		'-------------------------------------------------
+		' Execute the SQL statement to select all table
+		' records
+		'-------------------------------------------------
+		Call MyPrint("Executing non-spatial selection ...")
+
+		If sMapWhereClause <> "" Then
+			sMapWhereClause = " Where " + sMapWhereClause
+		End If
+
+		sCmd = "Select " + sMapColumns + " From " + sTableName + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
+		Run Command (sCmd)
+	End If
 
 	OnError Goto ErrorTrap
 
