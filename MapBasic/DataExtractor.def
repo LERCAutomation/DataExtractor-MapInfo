@@ -19,13 +19,13 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor.def v1.07
+'* DataExtractor.def v1.08
 '*
 '* Defines global variables and declares subroutines and functions.
 '*
 '*
 '* Created:			Andy Foy - November 2013
-'* Last revised:	Andy Foy - April 2019
+'* Last revised:	Andy Foy - May 2019
 '***************************************************************
 
 Include "MapBasic.def"
@@ -67,6 +67,24 @@ Type PROCESS_INFORMATION
 	hThread As Integer
 	dwProcessID As Integer
 	dwThreadID As Integer
+End Type
+
+Type FILETIME
+   dwLowDateTime As Integer
+   dwHighDateTime As Integer
+End Type
+
+Type WIN32_FIND_DATA
+   dwFileAttributes As Integer
+   ftCreationTime As FILETIME
+   ftLastAccessTime As FILETIME
+   ftLastWriteTime As FILETIME
+   nFileSizeHigh As Integer
+   nFileSizeLow As Integer
+   dwReserved0 As Integer
+   dwReserved1 As Integer
+   cFileName As String * 260
+   cAlternate As String * 14
 End Type
 
 Type FileDetails
@@ -127,6 +145,7 @@ End Type
 Define NORMAL_PRIORITY_CLASS &H20
 Define INFINITE -1
 Define STRING_LEN 1024
+Define FILE_ATTRIBUTE_DIRECTORY 16
 
 '-------------------------------------------------
 ' Declare the subroutines
@@ -136,6 +155,7 @@ Declare Sub GetToolTitle
 Declare Sub CreateToolMenu
 	(ByVal sToolTitle As String)
 Declare Sub GetDefaultValues
+	(ByVal sXMLFile As String)
 Declare Sub DataExtractor
 Declare Sub DialogSetup
 Declare Sub PartnerList_Handler
@@ -188,6 +208,7 @@ Declare Sub TranslateToShapefile
 	sShortName As String)
 Declare Sub Wait
 	(ByVal iSeconds as Integer)
+Declare Sub GetXmlProfile
 
 Declare Sub Sleep Lib "kernel32.dll" Alias "Sleep" 
 	(ByVal dwMilliseconds As Integer)
@@ -232,6 +253,11 @@ Declare Function SetStylePolygon(
 	ByVal oObj As Object,
 	ByVal stlPen As Pen,
 	ByVal stlBrush As Brush) As Object
+Declare Function GetFileList
+	(ByVal sFilePath As String,
+	ByVal sFileFilter As String,
+	sFileList() As String,
+	sFileExclude As String) As Logical
 
 Declare Function CreateDirectory Lib "kernel32"
 	Alias "CreateDirectoryA"
@@ -251,6 +277,30 @@ Declare Function WaitForSingleObject Lib "kernel32"
 Declare Function GetExitCodeProcess Lib "kernel32"
 	(ByVal hProcess As Integer,
 	lpExitCode As Integer) As Integer
+Declare Function CreateProcessA Lib "kernel32"
+	(ByVal lpApplicationName As Integer,
+	ByVal lpCommandLine As String,
+	ByVal lpProcessAttributes As Integer,
+	ByVal lpThreadAttributes As Integer,
+	ByVal bInheritHandles As Integer,
+	ByVal dwCreationFlags As Integer,
+	ByVal lpEnvironment As Integer,
+	ByVal lpCurrentDirectory As Integer,
+	lpStartupInfo As STARTUPINFO,
+	lpProcessInformation As PROCESS_INFORMATION) As Integer
+Declare Function GetUserName Lib "advapi32.dll" Alias "GetUserNameA" 
+	(lpBuffer As String, nSize As Integer) As Integer
+Declare Function FindFirstFile Lib "kernel32"
+	Alias "FindFirstFileA"
+	(ByVal lpFileName As String,
+	lpFindFileData As WIN32_FIND_DATA) As Integer
+Declare Function FindNextFile Lib "kernel32"
+	Alias "FindNextFileA"
+	(ByVal hFindFile As Integer,
+	lpFindFileData As WIN32_FIND_DATA) As Integer
+Declare Function FindClose Lib "kernel32"
+	(ByVal hFindFile As Integer) As Integer
+	
 Declare Function STLText2Symbol
 	(ByVal sSymbol As String) As Symbol
 Declare Function STLText2Pen
@@ -268,20 +318,6 @@ Declare Function StringReplace
 Declare Function GetUserID() As String
 Declare Function MonthNumToShortName
 	(ByVal iMonthNo As Integer) As String
-
-Declare Function CreateProcessA Lib "kernel32"
-	(ByVal lpApplicationName As Integer,
-	ByVal lpCommandLine As String,
-	ByVal lpProcessAttributes As Integer,
-	ByVal lpThreadAttributes As Integer,
-	ByVal bInheritHandles As Integer,
-	ByVal dwCreationFlags As Integer,
-	ByVal lpEnvironment As Integer,
-	ByVal lpCurrentDirectory As Integer,
-	lpStartupInfo As STARTUPINFO,
-	lpProcessInformation As PROCESS_INFORMATION) As Integer
-Declare Function GetUserName Lib "advapi32.dll" Alias "GetUserNameA" 
-	(lpBuffer As String, nSize As Integer) As Integer
 
 Declare Function MIXmlDocumentCreate Lib MIXML_LIB_NAME
 	Alias "MIXmlDocumentCreate" () As MIXmlDocument
@@ -336,6 +372,11 @@ Declare Function MIGetErrorCode Lib MIWEBSERVICES_LIB_NAME
 Global sVersion As String
 Global sUserId As String
 Global sToolTitle As String
+
+Global iXMLFile As Integer
+Global sXMLFile As String
+Global sDefaultXMLFile As String
+Global iDefaultXMLFile As Integer
 
 Global sDefaultPath As String
 Global sFileDSN As String

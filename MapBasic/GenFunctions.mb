@@ -20,13 +20,17 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* GenFunctions v1.42
+'* GenFunctions v1.43
 '*
 '* Contains general functions used by the DataExtractor tool.
 '*
 '*
-'* Created:		Andy Foy - February 2013
-'* Last revised:	Andy Foy - September 2015
+'* Created:			Andy Foy - February 2013
+'* Last revised:	Andy Foy - May 2019
+'* 
+'* *****************  Version 1.43  *****************
+'* Author: Andy Foy		Date: 28/05/2019
+'* A. Added function to get a list of files from a directory.
 '* 
 '* *****************  Version 1.42  *****************
 '* Author: Andy Foy		Date: 11/09/2015
@@ -458,4 +462,65 @@ Function MonthNumToShortName( ByVal iMonthNo As Integer ) As String
 			MonthNumToShortName = "Dec"
 	End Case
 	
+End Function
+
+Function GetFileList(ByVal sFilePath as String, ByVal sFileFilter as String, sFileList() as String, sFileExclude As String) as Logical
+'*************************************************
+'* Get a list of files from a directory
+'*************************************************
+OnError Goto CatchEx
+
+   Dim hFind As Integer
+   Dim wfd As WIN32_FIND_DATA
+   
+   Dim sFileName as String
+   Dim sSubDirFileList() As String
+
+   Dim iReturn as Integer 
+   iReturn = 1
+   
+   Dim i as Integer, j as Integer
+   i = 1 
+
+   hFind = FindFirstFile(sFilePath & sFileFilter, wfd)
+
+   sFileName = LTrim$(RTrim$(wfd.cFileName))
+   
+   If Len(sFileName) > 0 Then
+
+      Do While iReturn <> 0
+
+         If sFileName = "." or sFileName = ".." Then
+            iReturn = FindNextFile(hFind, wfd)
+            sFileName = LTrim$(RTrim$(wfd.cFileName))
+         Else
+           	sFileName = LTrim$(RTrim$(wfd.cFileName))
+            If wfd.dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY Then
+               iReturn = GetFileList(sFilePath & sFileName & "\", sFileFilter, sSubDirFileList(), sFileExclude)
+               For j = 1 to Ubound(sSubDirFileList)
+                  ReDim sFileList(i)
+                  sFileList(i) = sSubDirFileList(j)
+                  i = i + 1 
+               Next
+               iReturn = FindNextFile(hFind, wfd)
+            Else
+               If UCase$(sFileName) <> UCase$(sFileExclude) Then
+                   ReDim sFileList(i)
+                   sFileList(i) = Left$(sFileName, Len(sFileName) - Len(sFileFilter) + 1)
+	               i = i + 1
+	           End If
+               iReturn = FindNextFile(hFind, wfd)
+            End If
+         End If
+      Loop
+   End If
+
+   iReturn = FindClose(hFind)
+   GetFileList = true
+
+Done:
+   Exit Sub
+CatchEx:
+   Note Error$()
+   Resume Done
 End Function

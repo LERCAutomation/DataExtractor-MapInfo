@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.30
+'* DataExtractor v1.5.32
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,6 +29,10 @@
 '*
 '* Created:         Andy Foy - November 2012
 '* Last revised:    Andy Foy - May 2019
+'*
+'* *****************  Version 1.5.32  ***************
+'* Author: Andy Foy		Date: 23/05/2019
+'* A. Allow user to select XML profile to use.
 '*
 '* *****************  Version 1.5.31  ***************
 '* Author: Andy Foy		Date: 28/05/2019
@@ -211,7 +215,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.31"
+	sVersion = "1.5.32"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -280,6 +284,12 @@ Sub GetToolTitle
 						sToolTitle = sTitle
 					End If
 
+					' Default XML file
+					sDefaultXMLFile = GetSingleNodeValue(hXMLNode, "DefaultProfile")
+					If sDefaultXMLFile = "" Then
+						sDefaultXMLFile = "DefaultProfile"
+					End If
+
 				End If
 
 			End If
@@ -308,7 +318,7 @@ GetTitleError:
 
 End Sub
 
-Sub GetDefaultValues
+Sub GetDefaultValues(ByVal sXMLFile As String)
 '***************************************************************
 '* Retrieve all the default values from the config file
 '* which is a XML document
@@ -334,7 +344,7 @@ Sub GetDefaultValues
 		' Load the document into the document handle
 		'-------------------------------------------------
 		Dim iXMLLoad As SmallInt
-		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + sXMLFile, bParseError, FALSE, FALSE)
 		if iXMLLoad > 0 Then
 
 			'-------------------------------------------------
@@ -617,9 +627,18 @@ Sub DataExtractor
 	sUserID = StringReplace(sUserID, ".", "_")
 
 	'-------------------------------------------------
+	' Prompt the user for their required config file
+	'-------------------------------------------------
+	sXMLFile = ""
+	Call GetXmlProfile
+	If sXMLFile = "" Then
+		Exit Sub
+	End If
+	
+	'-------------------------------------------------
 	' Retrieve the default values from the config file
 	'-------------------------------------------------
-	Call GetDefaultValues
+	Call GetDefaultValues(sXMLFile)
 
 	'-------------------------------------------------
 	' Build a new dialog window
@@ -746,6 +765,125 @@ Done:
 ErrorTrap:
 	Note str$(Err()) + ": " + Error$()
 	Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
+	Resume Done
+
+End Sub
+
+Sub GetXMLProfile()
+'***************************************************************
+'* Create the user dialog window
+'***************************************************************
+
+	'-------------------------------------------------
+	' Trap errors
+	'-------------------------------------------------
+    OnError Goto ErrorTrap
+
+	'-------------------------------------------------
+	' Get an array of all the XML profiles in the
+	' same file directory as the application
+	'-------------------------------------------------
+	Dim sDir As String
+	sDir = ApplicationDirectory$()
+	
+	Dim sFileExclude As String
+	sFileExclude = "DataExtractor.xml"
+	
+	Dim bResult As Logical
+	Dim sFileNames() as String
+	bResult = GetFileList(sDir, "*.xml" , sFileNames(), sFileExclude)
+	
+	'-------------------------------------------------
+	' Loop through all the XML profiles
+	'-------------------------------------------------
+	Dim i as integer
+	Dim sXMLFiles As String
+	sXMLFiles = ""
+	iDefaultXMLFile = 0
+	If bResult = True And UBound(sFileNames()) > 0 Then
+	
+		For i = 1 to UBound(sFileNames())
+		
+			'-------------------------------------------------
+			' Build a string of the XML profiles
+			'-------------------------------------------------
+			sXMLFiles = sXMLFiles + sFileNames(i) + ";"
+			
+			If UCase$(sFileNames(i)) = UCase$(sDefaultXMLFile) Then
+				iDefaultXMLFile = i
+			End If
+	
+		Next
+		
+		sXMLFiles = Left$(sXMLFiles, Len(sXMLFiles) - 1)
+
+	Else
+
+		Note "There are no profile XML files in '" + ApplicationDirectory$() + "'"
+		Goto Done
+
+	End If	
+	
+	If UBound(sFileNames()) = 1 Then
+		sXMLFile = sFileNames(1) + ".xml"
+		Goto Done
+	End If
+	
+	'-------------------------------------------------
+	' Build a new dialog window
+	'-------------------------------------------------
+	Dialog
+		Title "Data Buffer " + sVersion
+		Width 190
+		Height 80
+		Position 50, 70
+
+	'-------------------------------------------------
+	' Add a profile table listbox
+	'-------------------------------------------------
+	Control StaticText Title "Please Choose a Profile:"
+		Position 10, 10
+	Control PopupMenu
+		ID 1
+		Title From Variable sXMLFiles
+		Value iDefaultXMLFile
+		Position 10, 20
+		Height 10
+		Width 170
+		Into iXMLFile
+
+	'-------------------------------------------------
+	' Add Ok and cancel buttons
+	'-------------------------------------------------
+	Control CancelButton
+		Position 95,60
+		Width 40
+	Control OkButton
+		Title "Ok"
+		Position 140,60
+		Width 40
+		'Calling CheckSelection
+
+	'-------------------------------------------------
+	' Store the dialog variables
+	'-------------------------------------------------
+	If CommandInfo(CMD_INFO_DLG_OK) Then
+		sXMLFile = sFileNames(iXMLFile) + ".xml"
+	Else
+		sXMLFile = ""
+	End If
+
+	'-------------------------------------------------
+	' Close the dialog
+	'-------------------------------------------------
+	'Dialog Remove
+
+Done:
+	Exit Sub
+	
+ErrorTrap:
+	Note str$(Err()) + ": " + Error$()
+	Call MyPrint(str$(Err()) + ": " + Error$())
 	Resume Done
 
 End Sub

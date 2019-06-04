@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+WARNING: This file should be changed carefully and a backup should be
+taken before any changes so that they can be backed out.  Changed lines
+can also be commented out as below.
+-->
+
+<!--
+This config file contains all the variables used by the DataExtractor
+MapBasic tool.
+
+The 'configuration' node is the 'root' node and signifies the start of the
+contents of the configuration file.
+
+The 'DataExtractor' node contains all of the entries relating to the
+MapBasic tool variables.
+
+Each entry relates to a file, folder, table name, column name or SQL statement
+used by the MapBasic tool to select and export data for partners.
+-->
+
+<configuration>
+<DataExtractor>
+
+  <!-- The existing file location where log files will be saved with output messages -->
+  <LogFilePath>
+	<value>D:\LRCs\GiGL\Data Exchange\Logs</value>
+  </LogFilePath>
+
+  <!-- The location of the File DSN that specifies which SQL Server database to connect to -->
+  <FileDSN>
+	<value>D:\Andy\GiGL\Data Exchange\SQL Server\NBNData.dsn</value>
+  </FileDSN>
+
+  <!-- The existing file location under which all partner sub-folders will be created -->
+  <DefaultPath>
+	<value>D:\LRCs\GiGL\Data Exchange\Extracts</value>
+  </DefaultPath>
+
+  <!-- The schema used in the SQL Server database -->
+  <DatabaseSchema>
+	<value>dbo</value>
+  </DatabaseSchema>
+
+  <!-- The SQL statement used to list all the tables in SQL Server that can be selected
+       by the user to extract for each partner -->
+  <TableListSQL>
+	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL[_]Spp[_]%' And table_name Not Like 'GiGL[_]Spp[_]%[_]%' Order By table_name</value>
+  </TableListSQL>
+
+  <!-- The name of the partner GIS layer in SQL Server used to select the records -->
+  <PartnerTable>
+	<value>CombinedExtractPolygons</value>
+  </PartnerTable>
+
+  <!-- The name of the column in the partner GIS layer containing the partner name passed to SQL
+       Server by the tool to use as the partner's boundary for selecting the records -->
+  <PartnerColumn>
+	<value>PartnerName</value>
+  </PartnerColumn>
+
+  <!-- The name of the column in the partner GIS layer containing the abbreviated name passed to
+       SQL Server by the tool to use as the sub-folder name for the destination of extracted
+       records -->
+  <ShortColumn>
+	<value>ShortName</value>
+  </ShortColumn>
+
+  <!-- The name of the column in the partner GIS layer containing any notes text relating
+       to the partner. -->
+  <NotesColumn>
+	<value>Notes</value>
+  </NotesColumn>
+
+  <!-- The name of the column in the partner GIS layer containing the Y/N flag to indicate
+       if the partner is currently active.  Only active partners will available for proccessing. -->
+  <ActiveColumn>
+	<value>Active</value>
+  </ActiveColumn>
+
+  <!-- The name of the column in the partner GIS layer containing the GIS format required for
+       the output records -->
+  <FormatColumn>
+	<value>GISformat</value>
+  </FormatColumn>
+
+  <!-- The name of the column in the partner GIS layer indicating whether an export should also
+       be created as a CSV or TXT file -->
+  <ExportColumn>
+	<value>Exportformat</value>
+  </ExportColumn>
+
+  <!-- The name of the column in the partner GIS layer indicating which SQL files should be
+       created for each partner -->
+  <SQLFilesColumn>
+	<value>SQLFiles</value>
+  </SQLFilesColumn>
+
+  <!-- The name of the column in the partner GIS layer indicating which Map files should be
+       created for each partner -->
+  <MapFilesColumn>
+	<value>MapFiles</value>
+  </MapFilesColumn>
+
+  <!-- The name of the column in the partner GIS layer indicating which survey tags, if any
+       should be included in the export -->
+  <TagsColumn>
+	<value>PartnerTags</value>
+  </TagsColumn>
+
+  <!-- The name of the column in the partner GIS layer containing the spatial geometry -->
+  <SpatialColumn>
+	<value>SP_GEOMETRY</value>
+  </SpatialColumn>
+
+  <!-- The options for the selection types -->
+  <SelectTypeOptions>
+	<value>Spatial Only;Survey Tags Only;Spatial and Survey Tags</value>
+  </SelectTypeOptions>
+
+  <!-- The default selection type (1 = spatial, 2 = tags, 3 = both) -->
+  <DefaultSelectType>
+	<value>3</value>
+  </DefaultSelectType>
+
+  <!-- The maximum number of records what will be extracted in any one partner extract.
+  Tables that would contain more than the maximum number of records will not be created -->
+  <RecMax>
+	<value>10000000</value>
+  </RecMax>
+
+  <!-- The default value for zipping the extract files. Leave blank to hide option in dialog. -->
+  <DefaultZip>
+	<value>No</value>
+  </DefaultZip>
+
+  <!-- The SQL criteria for excluding any confidential species records -->
+  <ConfidentialClause>
+	<value>R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
+  </ConfidentialClause>
+
+  <!-- The default value for extracting confidential surveys. Leave blank to hide option in dialog. -->
+  <DefaultConfidential>
+	<value>No</value>
+  </DefaultConfidential>
+
+  <!-- The path to the Universal Translator program -->
+  <UTPath>
+	<value>C:\Program Files (x86)\MapInfo\Professional\UT</value>
+  </UTPath>
+
+  <!-- The command to run the Universal Translator program -->
+  <UTCommand>
+	<value>Imut.exe</value>
+  </UTCommand>
+
+  <!-- The table columns and SQL where clauses used to select all the required columns for
+	the extract tables -->
+  <SQLTables>
+	<GiGL_AllSpp>
+		<OutputName>
+			<Value>GiGL_Species_All_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>RECORDYEAR &gt;= 1985 AND (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_AllSpp>
+	<DesignatedSpp>
+		<OutputName>
+			<Value>GiGL_Species_Designated_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>(NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND (STATUS_PLANNING IS NOT NULL OR STATUS_OTHER IS NOT NULL) AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<OrderClause>
+			<Value>TAXONOMIC_GROUP, SPP_NAME</Value>
+		</OrderClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,16711680,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,16711680,12,"MapInfo Dispersed Groups",0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</DesignatedSpp>
+	<GiGL_LISISpp>
+		<OutputName>
+			<Value>GiGL_Species_LISI_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>(NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND STATUS_LISI IS NOT NULL AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,0,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,0,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_LISISpp>
+	<GiGL_Birds>
+		<OutputName>
+			<Value>GiGL_Species_Birds_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>(NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND TAXONOMIC_GROUP = 'bird' AND GRIDREF IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_Birds>
+	<GiGL_SppAbsence>
+		<OutputName>
+			<Value>GiGL_Species_Absence_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>NEG_RECORD = 'Y' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,16732328,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,16732328,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_SppAbsence>
+	<GiGL_CoarseResolutionSpp>
+		<OutputName>
+			<Value>GiGL_Species_Coarse_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>GRPRECISION &gt;100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 1000</Value>
+				</Clause>
+				<Object>
+					<Value>Region</Value>
+				</Object>
+				<Pen>
+					<Value>2,2,10526880</Value>
+				</Pen>
+				<Brush>
+					<Value>5,10526880</Value>
+				</Brush>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 2000</Value>
+				</Clause>
+				<Object>
+					<Value>Region</Value>
+				</Object>
+				<Pen>
+					<Value>2,2,10526880</Value>
+				</Pen>
+				<Brush>
+					<Value>6,10526880</Value>
+				</Brush>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 10000</Value>
+				</Clause>
+				<Object>
+					<Value>Region</Value>
+				</Object>
+				<Pen>
+					<Value>2,2,10526880</Value>
+				</Pen>
+				<Brush>
+					<Value>1,10526880</Value>
+				</Brush>
+			</Symbol>
+		</Symbology>
+	</GiGL_CoarseResolutionSpp>
+	<GiGL_Plants>
+		<OutputName>
+			<Value>GiGL_Species_Plants_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>TAXONOMIC_GROUP = 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_Plants>
+	<GiGL_OtherSpp>
+		<OutputName>
+			<Value>GiGL_Species_Other_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>TAXONOMIC_GROUP &lt;&gt; 'bird' AND TAXONOMIC_GROUP &lt;&gt; 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,255,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,255,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_OtherSpp>
+	<GiGL_HistoricSpp>
+		<OutputName>
+			<Value>GiGL_Species_Historic_%partner%</Value>
+		</OutputName>
+		<Columns>
+			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
+		</Columns>
+		<WhereClause>
+			<Value>RECORDYEAR &lt; 1985 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
+		</WhereClause>
+		<Symbology>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION = 100</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,64,8421376,14,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+			<Symbol>
+				<Clause>
+					<Value>GRPRECISION &lt;= 10</Value>
+				</Clause>
+				<Object>
+					<Value>Point</Value>
+				</Object>
+				<Symbol>
+					<Value>2,65,8421376,12,MapInfo Dispersed Groups,0,0</Value>
+				</Symbol>
+			</Symbol>
+		</Symbology>
+	</GiGL_HistoricSpp>
+  </SQLTables>
+
+  <!-- The names and local names of the map tables and the required columns for the map tables -->
+  <MapTables>
+	<Habitat>
+		<TableName>
+			<Value>GiGL_Habitat</Value>
+		</TableName>
+		<OutputName>
+			<Value>GiGL_Habitat_%partner%</Value>
+		</OutputName>
+	  	<Columns>
+			<Value>HabitatShortName, HabitatLongName, HabitatClassification, ClassificationVersion, NBN_biotope, SiteName, SiteNameOther, SiteRef, Borough, NBN_Loc, PolygonID, GISlinkID, OriginalPolygonRef, AreaHa, CentroidX, CentroidY, SurveyDate, Surveyor, DataCreatedDate, DataCreatedUser, DataCreatedComment, LastModifiedDate, LastModifiedUser, LastModifiedComment, BaseMap, Digitisation, FurtherInfo</Value>
+		</Columns>
+		<Clause>
+			<Value></Value>
+		</Clause>
+	</Habitat>
+	<BAP_CA_S>
+		<TableName>
+			<Value>GiGL_BAP_Condition</Value>
+		</TableName>
+		<OutputName>
+			<Value>GiGL_BAP_Condition_%partner%</Value>
+		</OutputName>
+	  	<Columns>
+			<Value>ConditionShort, ConditionLong, SuitabilityShort, SuitabilityLong, OriginalHabShort, OriginalHabLong, SiteName, SiteNameOther, SiteRef, Borough, PolygonID, GISlinkID, OriginalPolygonRef, PolygonAreaHa, CentroidX, CentroidY, DataCreatedDate, DataCreatedUser, DataCreatedComment, BaseMap, Digitisation, FurtherInfo</Value>
+		</Columns>
+		<Clause>
+			<Value></Value>
+		</Clause>
+	</BAP_CA_S>
+  </MapTables>
+
+</DataExtractor>
+</configuration>
