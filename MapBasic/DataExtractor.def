@@ -402,6 +402,7 @@ Global sDefaultConfidential As String
 Global sDefaultUseCentroids As String
 Global sUTPath As String
 Global sUTCommand As String
+Global sDefaultClearLogFile As String
 
 Global sPartnerListSQL As String
 Global sLogFileName As String

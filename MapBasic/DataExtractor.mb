@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.32
+'* DataExtractor v1.5.33
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,11 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - May 2019
+'* Last revised:    Andy Foy - June 2019
+'*
+'* *****************  Version 1.5.33  ***************
+'* Author: Andy Foy		Date: 05/06/2019
+'* A. Add "DefaultClearLogFile" option to XML.
 '*
 '* *****************  Version 1.5.32  ***************
 '* Author: Andy Foy		Date: 23/05/2019
@@ -215,7 +219,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.32"
+	sVersion = "1.5.33"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -437,6 +441,9 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' Command for running universal translator program
 					sUTCommand = GetSingleNodeValue(hXMLNode, "UTCommand")
 
+					' Default option to clear log file
+					sDefaultClearLogFile = GetSingleNodeValue(hXMLNode, "DefaultClearLogFile")
+					
 					'-------------------------------------------------
 					' Get a handle on the SQLTables node
 					'-------------------------------------------------
@@ -714,7 +721,7 @@ Sub DataExtractor
 		ID 6
 		Title "Clear log file?"
 		Position 10,240
-		Value FALSE
+		Value bDefaultClearLogFile
 		'Into bClearLog
 
 	'-------------------------------------------------
@@ -1130,6 +1137,15 @@ SetDefaults:
 	'-------------------------------------------------
 	If sDefaultConfidential = "" Then
 		Alter Control 5 Hide
+	End If
+
+	'-------------------------------------------------
+	' Set the default value for clearing the log file
+	'-------------------------------------------------
+	If UCase$(sDefaultClearLogFile) = "YES" OR UCase$(sDefaultClearLogFile) = "Y" Then
+		Alter Control 6 Value TRUE
+	Else
+		Alter Control 6 Value FALSE
 	End If
 
 	'-------------------------------------------------

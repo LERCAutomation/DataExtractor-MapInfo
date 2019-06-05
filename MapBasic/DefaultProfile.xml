@@ -145,6 +145,11 @@ used by the MapBasic tool to select and export data for partners.
 	<value>No</value>
   </DefaultConfidential>
 
+  <!-- By default, should an existing log file be cleared? -->
+  <DefaultClearLogFile>
+		<value>Yes</value>
+  </DefaultClearLogFile>
+
   <!-- The path to the Universal Translator program -->
   <UTPath>
 	<value>C:\Program Files (x86)\MapInfo\Professional\UT</value>
