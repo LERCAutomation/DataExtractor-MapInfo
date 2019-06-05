@@ -6,7 +6,7 @@
 #*.MB	 diff=astextplain
 #*.def  diff=astextplain
 #*.DEF  diff=astextplain
-*.xml  diff=astextplain
-*.XML  diff=astextplain
+*.xml  diff=xml
+*.XML  diff=xml
 *.vbs  diff=astextplain
 *.VBS  diff=astextplain
