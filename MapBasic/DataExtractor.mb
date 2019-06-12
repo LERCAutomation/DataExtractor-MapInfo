@@ -721,7 +721,7 @@ Sub DataExtractor
 		ID 6
 		Title "Clear log file?"
 		Position 10,240
-		Value bDefaultClearLogFile
+		Value FALSE
 		'Into bClearLog
 
 	'-------------------------------------------------
