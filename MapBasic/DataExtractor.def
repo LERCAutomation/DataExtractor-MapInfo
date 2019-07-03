@@ -187,6 +187,13 @@ Declare Sub SelectMaps
 	sMapOrderClause As String,
 	sMapMacro As String,
 	sMapMacroParm As String)
+Declare Sub UploadtoServer(sEasyLoaderCommand As String,
+	sSchema As String,
+	sLogFile As String,
+	sFileDSN As String,
+	sTabFileName As String,
+	sRemoteTableName As String,
+	sSwitches As String)
 Declare Sub AboutBox
 Declare Sub egsit
 Declare Sub MyPrint
@@ -203,9 +210,9 @@ Declare Sub TranslateToShapefile
 	(sUTPath As String,
 	sUTCommand As String,
 	sDefaultPath As String,
+	sTempName As String,
 	sLocalPath As String,
-	sLocalName As String,
-	sShortName As String)
+	sLocalName As String)
 Declare Sub Wait
 	(ByVal iSeconds as Integer)
 Declare Sub GetXmlProfile
@@ -402,6 +409,9 @@ Global sDefaultConfidential As String
 Global sDefaultUseCentroids As String
 Global sUTPath As String
 Global sUTCommand As String
+Global sEasyLoaderPath As String
+Global sEasyLoaderCommand As String
+Global sEasyLoaderSwitches As String
 Global sDefaultClearLogFile As String
 
 Global sPartnerListSQL As String
@@ -434,6 +444,7 @@ Global bZipFiles As Logical
 Global bConfidentialSurveys As Logical
 Global bClearLog As Logical
 Global bUseCentroids As Logical
+Global bUploadToServer As Logical
 Global iSelectType As Integer
 
 Global sDateDD As String

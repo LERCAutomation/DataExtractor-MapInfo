@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.33
+'* DataExtractor v1.5.34
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,11 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - June 2019
+'* Last revised:    Andy Foy - July 2019
+'*
+'* *****************  Version 1.5.34  ***************
+'* Author: Andy Foy		Date: 03/07/2019
+'* A. Add option to upload partner table to SQL Server.
 '*
 '* *****************  Version 1.5.33  ***************
 '* Author: Andy Foy		Date: 05/06/2019
@@ -219,7 +223,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.33"
+	sVersion = "1.5.34"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -441,6 +445,12 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' Command for running universal translator program
 					sUTCommand = GetSingleNodeValue(hXMLNode, "UTCommand")
 
+					' Command for running EasyLoader program
+					sEasyLoaderCommand = GetSingleNodeValue(hXMLNode, "EasyLoaderCommand")
+
+					' Switches for running EasyLoader program
+					sEasyLoaderSwitches = GetSingleNodeValue(hXMLNode, "EasyLoaderSwitches")
+
 					' Default option to clear log file
 					sDefaultClearLogFile = GetSingleNodeValue(hXMLNode, "DefaultClearLogFile")
 					
@@ -653,7 +663,7 @@ Sub DataExtractor
 	Dialog
 		Title "Data Extractor " + sVersion
 		Width 370
-		Height 270
+		Height 285
 		Position 50, 70
 		Calling DialogSetup
 
@@ -735,6 +745,16 @@ Sub DataExtractor
 		'Into bUseCentroids
 
 	'-------------------------------------------------
+	' Add a checkbox for selecting polygons by centroids
+	'-------------------------------------------------
+	Control CheckBox
+		ID 8
+		Title "Upload partner table to server?"
+		Position 10,270
+		Value FALSE
+		'Into bUploadToServer
+
+	'-------------------------------------------------
 	' Add a popup menu for picking the select type
 	'-------------------------------------------------
 	Control StaticText Title "Selection Type:"
@@ -751,11 +771,11 @@ Sub DataExtractor
 	' Add Ok and cancel buttons
 	'-------------------------------------------------
 	Control CancelButton
-		Position 275,250
+		Position 275,265
 		Width 40
 	Control Button
 		Title "Ok"
-		Position 320,250
+		Position 320,265
 		Width 40
 		Calling CheckSelection
 
@@ -1118,7 +1138,7 @@ SetDefaults:
 	' Hide the zip checkbox if no default set
 	'-------------------------------------------------
 	If sDefaultZip = "" Then
-		Alter Control 4 Hide
+		Alter Control 4 Disable
 	End If
 
 	'-------------------------------------------------
@@ -1136,7 +1156,7 @@ SetDefaults:
 	' default set
 	'-------------------------------------------------
 	If sDefaultConfidential = "" Then
-		Alter Control 5 Hide
+		Alter Control 5 Disable
 	End If
 
 	'-------------------------------------------------
@@ -1163,7 +1183,15 @@ SetDefaults:
 	' if no default set
 	'-------------------------------------------------
 	If sDefaultUseCentroids = "" Then
-		Alter Control 7 Hide
+		Alter Control 7 Disable
+	End If
+
+	'-------------------------------------------------
+	' Hide the upload partner table to server checkbox
+	' if no EasyLoader command set
+	'-------------------------------------------------
+	If sEasyLoaderCommand = "" Then
+		Alter Control 8 Disable
 	End If
 
 	'-------------------------------------------------
@@ -1216,6 +1244,7 @@ Sub CheckSelection
 	bConfidentialSurveys = ReadControlValue(5)
 	bClearLog = ReadControlValue(6)
 	bUseCentroids = ReadControlValue(7)
+	bUploadToServer = ReadControlValue(8)
 	iSelectType = ReadControlValue(10)
 
 	'-------------------------------------------------
@@ -1410,6 +1439,20 @@ Sub CheckSelection
 	iFileErrorCount = 0
 
 	'-------------------------------------------------
+	' Upload the partner table to the server
+	'-------------------------------------------------
+	if bUploadToServer = True Then
+		Dim sLogFileName As String, sLogFile As String
+		sLogFileName = "EasyLoader" + "_" + sUserID + ".log"
+		sLogFile = sLogFilePath + "\" + sLogFileName
+		
+		Dim sPartnerTabFile As String
+		sPartnerTabFile = TableInfo(sPartnerTable, TAB_INFO_TABFILE)
+
+		Call UploadToServer(sEasyLoaderCommand, sDefaultSchema, sLogFile, sFileDSN, sPartnerTabFile, sPartnerTable, sEasyLoaderSwitches)
+	End If
+
+	'-------------------------------------------------
 	' Process the selections one by one
 	'-------------------------------------------------
 	iExtractCnt = 1
@@ -1453,6 +1496,38 @@ Sub CheckSelection
 		Note "Note: There were " & iFileErrorCount & " file access delays during this process."
 	End If
 
+End Sub
+
+Sub UploadtoServer(sEasyLoaderCommand As String, sSchema As String, sLogFile As String, sFileDSN As String, sTabFileName As String, sRemoteTableName As String, sSwitches As String)
+'*************************************************
+'* Routine to upload a MapInfo table name to
+'* a server
+'*************************************************
+
+	'-------------------------------------------------
+	' Create the upload command string
+	'-------------------------------------------------
+	Dim sUploadCmd as string
+	sUploadCmd = chr$(34) + sEasyLoaderCommand + chr$(34) +
+		" /B " + sSchema +
+		" /F " + sLogFile +
+		" /S FILEDSN=" + sFileDSN +
+		" /T " + sTabFileName + ";" + sRemoteTableName +
+		" " + sSwitches
+		
+	'-------------------------------------------------
+	' Execute the command and wait for it to finish
+	'-------------------------------------------------
+	Call MyPrint("Uploading partner table to server ...")
+	
+	If ExecuteAndWait(sUploadCmd) > 0 then
+		Call MyPrint("Error uploading partner table - process terminated.")
+		Call MyPrint("")
+		Exit Sub
+	End if
+
+	Call MyPrint("Upload to server complete.")
+	
 End Sub
 
 Sub ProcessExtracts
