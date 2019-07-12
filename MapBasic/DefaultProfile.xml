@@ -160,6 +160,16 @@ used by the MapBasic tool to select and export data for partners.
 	<value>Imut.exe</value>
   </UTCommand>
 
+  <!-- The command to run the EasyLoader program -->
+  <EasyLoaderCommand>
+	<value>C:\Program Files (x86)\MapInfo\Professional\Tools\EasyLoader.exe</value>
+  </EasyLoaderCommand>
+
+  <!-- The switches to run the EasyLoader program -->
+  <EasyLoaderSwitches>
+	<value>/E /F /K /P R /Q /Y</value>
+  </EasyLoaderSwitches>
+
   <!-- The table columns and SQL where clauses used to select all the required columns for
 	the extract tables -->
   <SQLTables>
@@ -173,6 +183,9 @@ used by the MapBasic tool to select and export data for partners.
 		<WhereClause>
 			<Value>RECORDYEAR &gt;= 1985 AND (NEG_RECORD &lt;&gt; 'Y' OR NEG_RECORD IS NULL) AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</WhereClause>
+		<OrderClause>
+			<Value></Value>
+		</OrderClause>
 		<Symbology>
 			<Symbol>
 				<Clause>

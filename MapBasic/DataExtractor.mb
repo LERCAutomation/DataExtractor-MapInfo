@@ -1,7 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012 - 2018 TVERC, GiGL, SBIC
+'* Copyright © 2012 - 2019 TVERC, GiGL, SBIC
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.34
+'* DataExtractor v1.5.35
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,6 +29,12 @@
 '*
 '* Created:         Andy Foy - November 2012
 '* Last revised:    Andy Foy - July 2019
+'*
+'* *****************  Version 1.5.35  ***************
+'* Author: Andy Foy		Date: 11/07/2019
+'* A. Display Where and Order By clauses in log for map
+'*    tables.
+'* B. Fix bugs setting symbology for TAB files.
 '*
 '* *****************  Version 1.5.34  ***************
 '* Author: Andy Foy		Date: 03/07/2019
@@ -223,7 +229,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.34"
+	sVersion = "1.5.35"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1138,7 +1144,7 @@ SetDefaults:
 	' Hide the zip checkbox if no default set
 	'-------------------------------------------------
 	If sDefaultZip = "" Then
-		Alter Control 4 Disable
+		Alter Control 4 Hide
 	End If
 
 	'-------------------------------------------------
@@ -1156,7 +1162,7 @@ SetDefaults:
 	' default set
 	'-------------------------------------------------
 	If sDefaultConfidential = "" Then
-		Alter Control 5 Disable
+		Alter Control 5 Hide
 	End If
 
 	'-------------------------------------------------
@@ -1183,7 +1189,7 @@ SetDefaults:
 	' if no default set
 	'-------------------------------------------------
 	If sDefaultUseCentroids = "" Then
-		Alter Control 7 Disable
+		Alter Control 7 Hide
 	End If
 
 	'-------------------------------------------------
@@ -1191,7 +1197,7 @@ SetDefaults:
 	' if no EasyLoader command set
 	'-------------------------------------------------
 	If sEasyLoaderCommand = "" Then
-		Alter Control 8 Disable
+		Alter Control 8 Hide
 	End If
 
 	'-------------------------------------------------
@@ -1405,6 +1411,7 @@ Sub CheckSelection
 
 		If FileExists(sLogFilePath + "\" + sLogFileShp + "_MUT.log") Then
 			Kill sLogFilePath + "\" + sLogFileShp + "_MUT.log"
+
 		End If
 	End If
 
@@ -1498,7 +1505,13 @@ Sub CheckSelection
 
 End Sub
 
-Sub UploadtoServer(sEasyLoaderCommand As String, sSchema As String, sLogFile As String, sFileDSN As String, sTabFileName As String, sRemoteTableName As String, sSwitches As String)
+Sub UploadtoServer(sEasyLoaderCommand As String,
+	sSchema As String,
+	sLogFile As String,
+	sFileDSN As String,
+	sTabFileName As String,
+	sRemoteTableName As String,
+	sSwitches As String)
 '*************************************************
 '* Routine to upload a MapInfo table name to
 '* a server
@@ -2397,7 +2410,7 @@ Sub SetSymbology(sNodeName as String, sTableName As String)
 		' Load the document into the document handle
 		'-------------------------------------------------
 		Dim iXMLLoad As SmallInt
-		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + "DataExtractor.xml", bParseError, FALSE, FALSE)
+		iXMLLoad = MIXmlDocumentLoad(hXMLDoc, ApplicationDirectory$() + sXMLFile, bParseError, FALSE, FALSE)
 		if iXMLLoad > 0 Then
 
 			'-------------------------------------------------
@@ -2464,7 +2477,7 @@ Sub SetSymbology(sNodeName as String, sTableName As String)
 						Dim sSQLClause As String
 						sSQLClause = sClause
 						If sSQLClause <> "" Then
-							sSQLClause = " And " & sSQLClause
+							sSQLClause = " And (" & sSQLClause & ")"
 						End If
 
 						'-------------------------------------------------
@@ -2716,10 +2729,15 @@ SelectRecords:
 		'-------------------------------------------------
 		Call MyPrint("Executing spatial selection ...")
 
-		If sMapWhereClause <> "" Then
+		If sMapWhereClause = "" Then
+	        Call MyPrint("No where clause was used")
+       	Else
+			Call MyPrint("Where clause is ... " + sMapWhereClause)
 			sMapWhereClause = " And " + sMapWhereClause
 		End If
-	
+
+		Call MyPrint("Order by clause is ... " + sMapOrderClause)
+
 		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 		Run Command (sCmd)
 	Else
@@ -2729,10 +2747,14 @@ SelectRecords:
 		'-------------------------------------------------
 		Call MyPrint("Executing non-spatial selection ...")
 
-		If sMapWhereClause <> "" Then
+		If sMapWhereClause = "" Then
+	        Call MyPrint("No where clause was used")
+       	Else
+			Call MyPrint("Where clause is ... " + sMapWhereClause)
 			sMapWhereClause = " Where " + sMapWhereClause
 		End If
 
+		Call MyPrint("Order by clause is ... " + sMapOrderClause)
 		sCmd = "Select " + sMapColumns + " From " + sTableName + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 		Run Command (sCmd)
 	End If
