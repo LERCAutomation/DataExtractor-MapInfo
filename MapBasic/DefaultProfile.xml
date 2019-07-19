@@ -170,6 +170,11 @@ used by the MapBasic tool to select and export data for partners.
 	<value>/E /F /K /P R /Q /Y</value>
   </EasyLoaderSwitches>
 
+  <!-- By default, should the EasyLoader program be run? -->
+  <DefaultEasyLoader>
+		<value>Yes</value>
+  </DefaultEasyLoader>
+
   <!-- The table columns and SQL where clauses used to select all the required columns for
 	the extract tables -->
   <SQLTables>

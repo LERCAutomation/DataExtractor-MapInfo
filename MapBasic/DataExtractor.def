@@ -412,6 +412,7 @@ Global sUTCommand As String
 Global sEasyLoaderPath As String
 Global sEasyLoaderCommand As String
 Global sEasyLoaderSwitches As String
+Global sDefaultEasyLoader As String
 Global sDefaultClearLogFile As String
 
 Global sPartnerListSQL As String

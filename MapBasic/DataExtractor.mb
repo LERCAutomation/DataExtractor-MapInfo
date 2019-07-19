@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.35
+'* DataExtractor v1.5.36
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,6 +29,11 @@
 '*
 '* Created:         Andy Foy - November 2012
 '* Last revised:    Andy Foy - July 2019
+'*
+'* *****************  Version 1.5.36  ***************
+'* Author: Andy Foy		Date: 19/07/2019
+'* A. Add "DefaultEastLoader" option to XML.
+'* B. Add details of funding organisations to About box.
 '*
 '* *****************  Version 1.5.35  ***************
 '* Author: Andy Foy		Date: 11/07/2019
@@ -229,7 +234,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.35"
+	sVersion = "1.5.36"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -445,6 +450,9 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' Default setting for extracting confidential surveys
 					sDefaultConfidential = GetSingleNodeValue(hXMLNode, "DefaultConfidential")
 
+					' Default option to clear log file
+					sDefaultClearLogFile = GetSingleNodeValue(hXMLNode, "DefaultClearLogFile")
+					
 					' Path to universal translator program
 					sUTPath = GetSingleNodeValue(hXMLNode, "UTPath")
 
@@ -457,8 +465,8 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' Switches for running EasyLoader program
 					sEasyLoaderSwitches = GetSingleNodeValue(hXMLNode, "EasyLoaderSwitches")
 
-					' Default option to clear log file
-					sDefaultClearLogFile = GetSingleNodeValue(hXMLNode, "DefaultClearLogFile")
+					' Default option to run the EasyLoader program
+					sDefaultEasyLoader = GetSingleNodeValue(hXMLNode, "DefaultEasyLoader")
 					
 					'-------------------------------------------------
 					' Get a handle on the SQLTables node
@@ -866,7 +874,7 @@ Sub GetXMLProfile()
 	' Build a new dialog window
 	'-------------------------------------------------
 	Dialog
-		Title "Data Buffer " + sVersion
+		Title "Data Extractor " + sVersion
 		Width 190
 		Height 80
 		Position 50, 70
@@ -1190,6 +1198,15 @@ SetDefaults:
 	'-------------------------------------------------
 	If sDefaultUseCentroids = "" Then
 		Alter Control 7 Hide
+	End If
+
+	'-------------------------------------------------
+	' Set the default value for uploading the partner table
+	'-------------------------------------------------
+	If UCase$(sDefaultEasyLoader) = "YES" OR UCase$(sDefaultEasyLoader) = "Y" Then
+		Alter Control 8 Value TRUE
+	Else
+		Alter Control 8 Value FALSE
 	End If
 
 	'-------------------------------------------------
@@ -3016,8 +3033,8 @@ Sub AboutBox
 
 	Dialog
 		Title "About Data Extractor " + sVersion
-		Width 230
-		Height 115
+		Width 210
+		Height 155
 
 	Control StaticText
 		Title "This program will extract SQL records and/or GIS"
@@ -3035,10 +3052,22 @@ Sub AboutBox
 		Title "Created by Andy Foy Consulting."
 		Position 10,60
 	Control StaticText
-		Title "Copyright© 2012 - 2018 GiGL, TVERC, SBIC."
+		Title "Copyright© 2012 - 2019 GiGL, TVERC, SBIC."
 		Position 10,70
+	Control StaticText
+		Title "This tool was developed with funding from:"
+		Position 10,90
+	Control StaticText
+		Title "  Greenspace Information for Greater London CIC"
+		Position 10,100
+	Control StaticText
+		Title "  Thames Valley Environmental Records Centre"
+		Position 10,110
+	Control StaticText
+		Title "  Surrey Biodiversity Information Centre"
+		Position 10,120
 	Control OKButton
-		Position 185,95
+		Position 165,135
 
 End Sub
 
