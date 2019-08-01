@@ -1,13 +1,13 @@
-Data Extractor
-==============
+DataExtractor
+=============
 
-DataExtractor tool v1.5.39
+DataExtractor tool
 
 Copyright © 2012-2019 GiGL, TVERC, SBIC
 
 Overview
 --------
-DataExtractor is a MapBasic tool and associated SQL scripts to extract biodiversity information from SQL Server and MapInfo GIS layer for pre-defined spatial areas. The output files can be created as MapInfo TAB format (.tab) files, ESRI shapefile (.tab) files and/or Comma Separated Value (.csv) files and can be combined together, if required, as compressed (.zip) files.
+DataExtractor is a MapBasic tool and associated SQL scripts to extract biodiversity information from SQL Server and MapInfo GIS layers for pre-defined spatial areas. The output files can be created as MapInfo TAB format (.tab) files, ESRI Shapefile (.shp) files and/or Comma Separated Value (.csv) files and can be combined together, if required, as compressed (.zip) files.
 
 Requirements
 ------------
