@@ -469,9 +469,6 @@ Function GetFileList(ByVal sFilePath as String, ByVal sFileFilter as String, sFi
 '* Get a list of files from a directory
 '*************************************************
 OnError Goto CatchEx
-
-   Dim hFind As Integer
-   Dim wfd As WIN32_FIND_DATA
    
    Dim sFileName as String
    Dim sSubDirFileList() As String

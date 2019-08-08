@@ -1,7 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012 - 2018 GiGL, TVERC, SBIC
+'* Copyright © 2012 - 2019 GiGL, TVERC, SBIC
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -33,10 +33,12 @@ Include "Menu.def"
 Include "Icons.def"
 
 'Include "XMLMenu32.def"
+'Include "Windows32.def"
 
 Include "IMapInfoPro.def"
 Include "Enums.def"
 Include "XMLMenu64.def"
+Include "Windows64.def"
 
 '-------------------------------------------------
 ' Define the custom variable types
@@ -67,24 +69,6 @@ Type PROCESS_INFORMATION
 	hThread As Integer
 	dwProcessID As Integer
 	dwThreadID As Integer
-End Type
-
-Type FILETIME
-   dwLowDateTime As Integer
-   dwHighDateTime As Integer
-End Type
-
-Type WIN32_FIND_DATA
-   dwFileAttributes As Integer
-   ftCreationTime As FILETIME
-   ftLastAccessTime As FILETIME
-   ftLastWriteTime As FILETIME
-   nFileSizeHigh As Integer
-   nFileSizeLow As Integer
-   dwReserved0 As Integer
-   dwReserved1 As Integer
-   cFileName As String * 260
-   cAlternate As String * 14
 End Type
 
 Type FileDetails
@@ -187,13 +171,6 @@ Declare Sub SelectMaps
 	sMapOrderClause As String,
 	sMapMacro As String,
 	sMapMacroParm As String)
-Declare Sub UploadtoServer(sEasyLoaderCommand As String,
-	sSchema As String,
-	sLogFile As String,
-	sFileDSN As String,
-	sTabFileName As String,
-	sRemoteTableName As String,
-	sSwitches As String)
 Declare Sub AboutBox
 Declare Sub egsit
 Declare Sub MyPrint
@@ -265,6 +242,13 @@ Declare Function GetFileList
 	ByVal sFileFilter As String,
 	sFileList() As String,
 	sFileExclude As String) As Logical
+Declare Function UploadtoServer(sEasyLoaderCommand As String,
+	sSchema As String,
+	sLogFile As String,
+	sFileDSN As String,
+	sTabFileName As String,
+	sRemoteTableName As String,
+	sSwitches As String) As Integer
 
 Declare Function CreateDirectory Lib "kernel32"
 	Alias "CreateDirectoryA"
@@ -273,6 +257,11 @@ Declare Function CreateDirectory Lib "kernel32"
 Declare Function SetCurrentDirectory Lib "kernel32"
 	Alias "SetCurrentDirectoryA"
 	(lpBuffer As String) As Integer
+Declare Function SHCreateDirectoryEx Lib "shell32.dll"
+	Alias "SHCreateDirectoryExA"
+	(ByVal hwnd as integer,
+	Byval LPCWSTR as string,
+	ByVal iSecurityAttributes as Integer) As integer
 Declare Function MoveFile Lib "kernel32" Alias "MoveFileA"
 	(byval lpExistingFileName as string,
 	byval lpNewFileName as string) As Integer
@@ -297,16 +286,6 @@ Declare Function CreateProcessA Lib "kernel32"
 	lpProcessInformation As PROCESS_INFORMATION) As Integer
 Declare Function GetUserName Lib "advapi32.dll" Alias "GetUserNameA" 
 	(lpBuffer As String, nSize As Integer) As Integer
-Declare Function FindFirstFile Lib "kernel32"
-	Alias "FindFirstFileA"
-	(ByVal lpFileName As String,
-	lpFindFileData As WIN32_FIND_DATA) As Integer
-Declare Function FindNextFile Lib "kernel32"
-	Alias "FindNextFileA"
-	(ByVal hFindFile As Integer,
-	lpFindFileData As WIN32_FIND_DATA) As Integer
-Declare Function FindClose Lib "kernel32"
-	(ByVal hFindFile As Integer) As Integer
 	
 Declare Function STLText2Symbol
 	(ByVal sSymbol As String) As Symbol
@@ -404,8 +383,8 @@ Global sSelectTypeOptions As String
 Global iDefaultSelectType As Integer
 Global iRecMax As Integer
 Global sDefaultZip As String
-Global sConfidentialClause As String
-Global sDefaultConfidential As String
+Global sExclusionClause As String
+Global sDefaultExclusion As String
 Global sDefaultUseCentroids As String
 Global sUTPath As String
 Global sUTCommand As String
@@ -416,6 +395,7 @@ Global sDefaultEasyLoader As String
 Global sDefaultClearLogFile As String
 
 Global sPartnerListSQL As String
+Global sLogFilePath As String
 Global sLogFileName As String
 Global bSpatialTables As Logical
 Global sDefaultPointPrecision As String
@@ -442,7 +422,7 @@ Global iSQLTable As Integer
 Global iMapTable As Integer
 Global nConn As Integer
 Global bZipFiles As Logical
-Global bConfidentialSurveys As Logical
+Global bApplyExclusion As Logical
 Global bClearLog As Logical
 Global bUseCentroids As Logical
 Global bUploadToServer As Logical
