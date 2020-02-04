@@ -32,13 +32,13 @@ Include "MapBasic.def"
 Include "Menu.def"
 Include "Icons.def"
 
-'Include "XMLMenu32.def"
-'Include "Windows32.def"
+Include "XMLMenu32.def"
+Include "Windows32.def"
 
-Include "IMapInfoPro.def"
-Include "Enums.def"
-Include "XMLMenu64.def"
-Include "Windows64.def"
+'Include "IMapInfoPro.def"
+'Include "Enums.def"
+'Include "XMLMenu64.def"
+'Include "Windows64.def"
 
 '-------------------------------------------------
 ' Define the custom variable types
@@ -145,8 +145,7 @@ Declare Sub DialogSetup
 Declare Sub PartnerList_Handler
 Declare Sub CheckSelection
 Declare Sub SelectSQL
-	(ByVal nConn As Integer,
-	sPartnerName As String,
+	(sPartnerName As String,
 	sShortName As String,
 	sFormat As String,
 	sExport As String,

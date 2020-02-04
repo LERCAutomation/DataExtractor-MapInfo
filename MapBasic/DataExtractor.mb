@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.5.40
+'* DataExtractor v1.5.42
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,19 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - August 2019
+'* Last revised:    Andy Foy - January 2020
+'*
+'* *****************  Version 1.5.42  ***************
+'* Author: Andy Foy		Date: 23/01/2020
+'* A. Avoid SQL Server timeouts by re-connecting for
+'*    each output.
+'* B. Reverse out change to EasyLoader to not use
+'*    quotes in file paths.
+'*
+'* *****************  Version 1.5.41  ***************
+'* Author: Andy Foy		Date: 31/10/2019
+'* A. Fix bug executing EasyLoader with spaces in file
+'*    paths.
 '*
 '* *****************  Version 1.5.40  ***************
 '* Author: Andy Foy		Date: 08/08/2019
@@ -49,7 +61,7 @@
 '*
 '* *****************  Version 1.5.36  ***************
 '* Author: Andy Foy		Date: 19/07/2019
-'* A. Add "DefaultEastLoader" option to XML.
+'* A. Add "DefaultEasyLoader" option to XML.
 '* B. Add details of funding organisations to About box.
 '*
 '* *****************  Version 1.5.35  ***************
@@ -251,7 +263,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.5.40"
+	sVersion = "1.5.42"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -833,13 +845,6 @@ Sub DataExtractor
 		Calling CheckSelection
 
 Done:
-	'-------------------------------------------------
-	' Disconnect the connection to the SQL Server database
-	'-------------------------------------------------
-	If nConn <> 0 Then
-		Server nConn Disconnect
-	End If
-
 	Exit Sub
 	
 ErrorTrap:
@@ -982,25 +987,6 @@ Sub DialogSetup
 	Close Window Message
 
 	'-------------------------------------------------
-	' Trap any connection errors
-	'-------------------------------------------------
-	OnError Goto ConnectionError
-
-	'-------------------------------------------------
-	' Connect to the SQL Server database
-	'-------------------------------------------------
-	nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
-	If nConn = 0 Then
-		Note "Error: Unable to connect to SQL Server!"
-		Call egsit
-	End If 
-
-	'-------------------------------------------------
-	' No longer trap any errors
-	'-------------------------------------------------
-	OnError Goto 0
-
-	'-------------------------------------------------
 	' Check the partner table is already open in
 	' MapInfo
 	'-------------------------------------------------
@@ -1078,6 +1064,25 @@ Sub DialogSetup
 
 GetSQLTables:
 	'-------------------------------------------------
+	' Trap any connection errors
+	'-------------------------------------------------
+	OnError Goto ConnectionError
+
+	'-------------------------------------------------
+	' Connect to the SQL Server database
+	'-------------------------------------------------
+	nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
+	If nConn = 0 Then
+		Note "Error: Unable to connect to SQL Server!"
+		Call egsit
+	End If 
+
+	'-------------------------------------------------
+	' No longer trap any errors
+	'-------------------------------------------------
+	OnError Goto 0
+
+	'-------------------------------------------------
 	' Query all the tables in the database
 	'-------------------------------------------------
 	Dim nStmt as Integer
@@ -1114,6 +1119,13 @@ GetSQLTables:
 	' Close the query results
 	'-------------------------------------------------
 	Server nStmt Close
+
+	'-------------------------------------------------
+	' Disconnect the connection to the SQL Server database
+	'-------------------------------------------------
+	If nConn <> 0 Then
+		Server nConn Disconnect
+	End If
 
 	'-------------------------------------------------
 	' Update the SQL Table list to show the list
@@ -1600,7 +1612,7 @@ Function UploadtoServer(sEasyLoaderCommand As String,
 	Dim sUploadCmd as string
 	sUploadCmd = chr$(34) + sEasyLoaderCommand + chr$(34) +
 		" /B " + sSchema +
-		" /F " + chr$(34) + sLogFile + chr$(34) +
+		" /F " + sLogFile +
 		" /S " + "FILEDSN=" + sFileDSN +
 		" /T " + sTabFileName + ";" + sRemoteTableName +
 		" " + sSwitches
@@ -1717,7 +1729,7 @@ Sub ProcessExtracts
 	' the selected table for the selected partner
 	'-------------------------------------------------
 	If sTableType = "SQL" Then
-		Call SelectSQL(nConn, sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
+		Call SelectSQL(sPartnerName, sShortName, sFormat, sExport, sFiles, iSelectType, sTableName)
 	Else
 		Call SelectMaps(sPartnerName, sShortName, sFormat, sExport, sFiles, sNodeName, sTableName, sOutputName, sOutputType, sMapColumns, sMapWhereClause, sMapOrderClause, sMapMacro, sMapMacroParm)
 	End If
@@ -1772,8 +1784,7 @@ ErrorTrap:
 
 End Sub
 
-Sub SelectSQL (ByVal nConn As Integer,
-	sPartnerName As String,
+Sub SelectSQL (sPartnerName As String,
 	sShortName As String,
 	sFormat As String,
 	sExport As String,
@@ -1849,6 +1860,25 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Dim nStmt1 As Integer
 	Call MyPrint("Executing spatial selection ...")
 
+	'-------------------------------------------------
+	' Trap any connection errors
+	'-------------------------------------------------
+	OnError Goto ConnectionError
+
+	'-------------------------------------------------
+	' Connect to the SQL Server database
+	'-------------------------------------------------
+	nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
+	If nConn = 0 Then
+		Call MyPrint("Error: Unable to connect to SQL Server!")
+		Exit Sub
+	End If 
+
+	'-------------------------------------------------
+	' Trap any errors
+	'-------------------------------------------------
+	OnError Goto ErrorTrap
+
 	nStmt1 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFSelectSppRecords '" + sDefaultSchema
 	 + "', '" + sPartnerTable + "', '" + sPartnerColumn + "', '"
 	 + sPartnerName + "', '" + sTagsColumn + "', '" + sSpatialColumn + "', " + iSelectType + ", '" + sTableName + "', '" + sUser + "', " + iUseCentroids)
@@ -1893,6 +1923,13 @@ Sub SelectSQL (ByVal nConn As Integer,
 	Server nStmt2 Close
 
 	'-------------------------------------------------
+	' Disconnect the connection to the SQL Server database
+	'-------------------------------------------------
+	If nConn <> 0 Then
+		Server nConn Disconnect
+	End If
+
+	'-------------------------------------------------
 	' Loop through all the SQL clauses in the array
 	' and create a subset of the temporary table
 	' using each clause if the clause name is found
@@ -1911,6 +1948,25 @@ Sub SelectSQL (ByVal nConn As Integer,
 '		Call MyPrint("sSQLOrderClause = " + SQLFiles(i).OrderClause)
 '		Call MyPrint("sSQLMacro = " + SQLFiles(i).Macro)
 '		Call MyPrint("sSQLMacroParm = " + SQLFiles(i).MacroParm)
+
+		'-------------------------------------------------
+		' Trap any connection errors
+		'-------------------------------------------------
+		OnError Goto ConnectionError
+	
+		'-------------------------------------------------
+		' Connect to the SQL Server database
+		'-------------------------------------------------
+		nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
+		If nConn = 0 Then
+			Call MyPrint("Error: Unable to connect to SQL Server!")
+			Exit Sub
+		End If 
+	
+		'-------------------------------------------------
+		' Trap any errors
+		'-------------------------------------------------
+		OnError Goto ErrorTrap
 
 		'-------------------------------------------------
 		' If this SQL clause is found in the partner
@@ -2056,14 +2112,6 @@ LinkTemp:
 		
 		Call MyPrint("Linking dummy table ...")
 		
-'		Server nConn Link Table
-'		sSQLStmt
-'		Toolkit "ODBC"
-'		Into sTempTable
-'		File sLocalPath + "\" + sLocalTable
-'		Autokey Off
-'		ReadOnly
-
 		Dim sCmd As String
 		sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sLocalPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
 		Run Command (sCmd)
@@ -2169,14 +2217,6 @@ LinkTable:
 		
 		Call MyPrint("Linking temporary table ...")
 		
-'		Server nConn Link Table
-'		sSQLStmt
-'		Toolkit "ODBC"
-'		Into sTempTable
-'		File sLocalPath + "\" + sLocalTable
-'		Autokey Off
-'		ReadOnly
-
 		sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sLocalPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
 		Run Command (sCmd)
 
@@ -2383,6 +2423,13 @@ ExportTable:
 			End If
 		End If
 
+		'-------------------------------------------------
+		' Disconnect the connection to the SQL Server database
+		'-------------------------------------------------
+		If nConn <> 0 Then
+			Server nConn Disconnect
+		End If
+
 	'-------------------------------------------------
 	' Process the next SQL clause
 	'-------------------------------------------------
@@ -2394,6 +2441,25 @@ NextClause:
 	' the temporary SQL table
 	'-------------------------------------------------
 CleanUp:
+	'-------------------------------------------------
+	' Trap any connection errors
+	'-------------------------------------------------
+	OnError Goto ConnectionError
+
+	'-------------------------------------------------
+	' Connect to the SQL Server database
+	'-------------------------------------------------
+	nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
+	If nConn = 0 Then
+		Call MyPrint("Error: Unable to connect to SQL Server!")
+		Exit Sub
+	End If 
+
+	'-------------------------------------------------
+	' Trap any errors
+	'-------------------------------------------------
+	OnError Goto ErrorTrap
+
 	Dim nStmt3 As Integer
 	nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
 	+ "', '" + sTableName + "', '" + sUser + "'")
@@ -2403,6 +2469,13 @@ CleanUp:
 	'-------------------------------------------------
 	Server nStmt3 Close
 
+	'-------------------------------------------------
+	' Disconnect the connection to the SQL Server database
+	'-------------------------------------------------
+	If nConn <> 0 Then
+		Server nConn Disconnect
+	End If
+
 ExitSub:
 
 	If iWaitCount > 0 Then
@@ -2411,16 +2484,23 @@ ExitSub:
 
 	Exit Sub
 
+ConnectionError:
+	If Err() = 1333 Then
+		Call MyPrint("Error: Unable to connect to SQL Server!")
+	End If
+
+	Goto ExitSub
+
 TempError:
-	ErrorType = "Temp"	
+	ErrorType = "Temp"
 	Goto ErrorTrap
 
 LinkError:
-	ErrorType = "Link"	
+	ErrorType = "Link"
 	Goto ErrorTrap
 
 ExportError:
-	ErrorType = "Export"	
+	ErrorType = "Export"
 	Goto ErrorTrap
 
 ErrorTrap:
