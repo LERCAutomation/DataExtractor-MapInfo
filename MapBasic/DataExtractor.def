@@ -1,7 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012 - 2019 GiGL, TVERC, SBIC
+'* Copyright © 2012 - 2020 GiGL, TVERC, SBIC
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -71,7 +71,7 @@ Type PROCESS_INFORMATION
 	dwThreadID As Integer
 End Type
 
-Type FileDetails
+Type SQLDetails
 	Node As String
 	TableName As String
 	OutputName As String
@@ -101,6 +101,7 @@ Type PartnerDetails
 	Notes As String
 	Formats As String
 	Exports As String
+	SQLTable As String
 	SQLFiles As String
 	MapFiles As String
 End Type
@@ -123,6 +124,17 @@ Type ProcessDetails
 	MacroParm As String
 End Type
 
+Type SYSTEMTIME
+    wYear As SmallInt 
+    wMonth As SmallInt 
+    wDayOfWeek As SmallInt 
+    wDay As SmallInt 
+    wHour As SmallInt 
+    wMinute As SmallInt 
+    wSecond As SmallInt 
+    wMilliseconds As SmallInt 
+End Type
+
 '-------------------------------------------------
 ' Define the custom keywords
 '-------------------------------------------------
@@ -130,6 +142,10 @@ Define NORMAL_PRIORITY_CLASS &H20
 Define INFINITE -1
 Define STRING_LEN 1024
 Define FILE_ATTRIBUTE_DIRECTORY 16
+Define GENERIC_READ &H80000000
+Define FILE_SHARE_READ &H1
+Define OPEN_EXISTING &H3
+Define INVALID_HANDLE_VALUE -1
 
 '-------------------------------------------------
 ' Declare the subroutines
@@ -143,6 +159,8 @@ Declare Sub GetDefaultValues
 Declare Sub DataExtractor
 Declare Sub DialogSetup
 Declare Sub PartnerList_Handler
+Declare Sub SQLTables_Handler
+Declare Sub MapTables_Handler
 Declare Sub CheckSelection
 Declare Sub SelectSQL
 	(sPartnerName As String,
@@ -151,7 +169,15 @@ Declare Sub SelectSQL
 	sExport As String,
 	sSQLFiles As String,
 	iSelectType As Integer,
-	sTableName As String)
+	sNodeName as String,
+	sTableName As String,
+	sOutputName As String,
+	sOutputType As String,
+	sMapColumns As String,
+	sMapWhereClause As String,
+	sMapOrderClause As String,
+	sMapMacro As String,
+	sMapMacroParm As String)
 Declare Sub SetSymbology
 	(sNodeName As String,
 	sTableName As String)
@@ -195,6 +221,8 @@ Declare Sub GetXmlProfile
 
 Declare Sub Sleep Lib "kernel32.dll" Alias "Sleep" 
 	(ByVal dwMilliseconds As Integer)
+Declare Sub GetSystemTime Lib "kernel32" (
+	lpSystemTime As SYSTEMTIME)
 
 Declare Sub MIXmlDocumentDestroy Lib MIXML_LIB_NAME
 	Alias "MIXmlDocumentDestroy" (
@@ -248,6 +276,8 @@ Declare Function UploadtoServer(sEasyLoaderCommand As String,
 	sTabFileName As String,
 	sRemoteTableName As String,
 	sSwitches As String) As Integer
+Declare Function GetFileDateTime(ByVal FileName As String,
+        ByVal NoGMTConvert As Logical) As String
 
 Declare Function CreateDirectory Lib "kernel32"
 	Alias "CreateDirectoryA"
@@ -262,10 +292,10 @@ Declare Function SHCreateDirectoryEx Lib "shell32.dll"
 	Byval LPCWSTR as string,
 	ByVal iSecurityAttributes as Integer) As integer
 Declare Function MoveFile Lib "kernel32" Alias "MoveFileA"
-	(byval lpExistingFileName as string,
-	byval lpNewFileName as string) As Integer
+	(ByVal lpExistingFileName as string,
+	ByVal lpNewFileName as string) As Integer
 Declare Function CloseHandle Lib "kernel32"
-	(hObject As Integer) As smallint
+	(ByVal hObject As Integer) As smallint
 Declare Function WaitForSingleObject Lib "kernel32"
 	(ByVal hHandle As Integer,
 	ByVal dwMilliseconds As Integer) As Integer
@@ -285,7 +315,26 @@ Declare Function CreateProcessA Lib "kernel32"
 	lpProcessInformation As PROCESS_INFORMATION) As Integer
 Declare Function GetUserName Lib "advapi32.dll" Alias "GetUserNameA" 
 	(lpBuffer As String, nSize As Integer) As Integer
-	
+Declare Function GetFileTime Lib "kernel32" Alias "GetFileTime"
+    (ByVal hFile As Integer,
+    CreateTime As FileTime,
+    LastAccessTime As FileTime,
+    LastModified As FileTime) As Integer
+Declare Function CreateFile Lib "kernel32" Alias "CreateFileA"
+    (ByVal lpFilename As String,
+    ByVal dwDesiredAccess As Integer,
+    ByVal dwShareMode As Integer,
+    ByVal lpSecurityAttributes As Integer,
+    ByVal dwCreationDisposition As Integer,
+    ByVal dwFlagsAndAttributes As Integer,
+    ByVal hTemplateFile As Integer) As Integer
+Declare Function FileTimeToLocalFileTime Lib "kernel32" (
+    lpFileTime As FileTime,
+    lpLocalFileTime As FileTime) As Integer
+Declare Function FileTimeToSystemTime Lib "kernel32" (
+    lpFileTime As FileTime,
+    lpSystemTime As SYSTEMTIME) As Integer
+
 Declare Function STLText2Symbol
 	(ByVal sSymbol As String) As Symbol
 Declare Function STLText2Pen
@@ -303,6 +352,10 @@ Declare Function StringReplace
 Declare Function GetUserID() As String
 Declare Function MonthNumToShortName
 	(ByVal iMonthNo As Integer) As String
+Declare Function MonthNumToQuarter
+	(ByVal iMonthNo As Integer) As String
+Declare Function MonthNumToFinancialYear
+	(ByVal iMonthNo As Integer, ByVal iYear As Integer) As String
 
 Declare Function MIXmlDocumentCreate Lib MIXML_LIB_NAME
 	Alias "MIXmlDocumentCreate" () As MIXmlDocument
@@ -364,6 +417,7 @@ Global sDefaultXMLFile As String
 Global iDefaultXMLFile As Integer
 
 Global sDefaultPath As String
+Global sPartnerFolder As String
 Global sFileDSN As String
 Global sDefaultSchema As String
 Global sTableListSQL As String
@@ -374,6 +428,7 @@ Global sNotesColumn As String
 Global sActiveColumn As String
 Global sFormatColumn As String
 Global sExportColumn As String
+Global sSQLTableColumn As String
 Global sSQLFilesColumn As String
 Global sMapFilesColumn As String
 Global sTagsColumn As String
@@ -406,9 +461,10 @@ Global Partners(999) As PartnerDetails
 Global PartnersList(999) As String
 
 Global SQLTablesList(99) As String
+Global SQLFilesList(99) As String
 Global OpenMapsList(99) As String
 
-Global SQLFiles(99) As FileDetails
+Global SQLFiles(99) As SQLDetails
 Global AllMaps(99) As MapDetails
 Global OpenMaps(99) As MapDetails
 
@@ -432,7 +488,9 @@ Global sDateMM As String
 Global sDateMMM As String
 Global sDateYY As String
 Global sDateYYYY As String
+Global sDateQQ As String
+Global sDateFFFF As String
 
-Global sLastShortName As String
+Global sLastPartnerName As String
 
-Global iFileErrorCount as Integer
+Global iErrorCount as Integer

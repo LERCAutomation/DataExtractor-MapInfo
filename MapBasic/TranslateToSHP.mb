@@ -20,14 +20,18 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* TranslateToSHP v1.43
+'* TranslateToSHP v1.44
 '*
 '* Contains functions to translate MapInfo .tab files into
 '* ESRI .shp files.
 '*
 '*
 '* Created:				Andy Foy - February 2013
-'* Last revised:		Andy Foy - August 2017
+'* Last revised:		Andy Foy - July 2020
+'*
+'* *****************  Version 1.44  *****************
+'* Author: Andy Foy		Date: 06/07/2020
+'* A. Output shapefiles to ArcGIS subdirectory.
 '*
 '* *****************  Version 1.43  *****************
 '* Author: Andy Foy		Date: 09/08/2017
@@ -70,10 +74,11 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 	
 	If Right$(sLocalPath, 1) = "\" Then
 		sInputFile = sLocalPath + sLocalName + ".TAB"
-		sResultDir = Left$(sLocalPath, Len(sLocalPath) - 1)
+		'sResultDir = Left$(sLocalPath, Len(sLocalPath) - 1)
+		sResultDir = sLocalPath + "ArcGIS"
 	Else
 		sInputFile = sLocalPath + "\" + sLocalName + ".TAB"
-		sResultDir = sLocalPath
+		sResultDir = sLocalPath + "\" + "ArcGIS"
 	End if
 
 	If Right$(sDefaultPath, 1) = "\" Then

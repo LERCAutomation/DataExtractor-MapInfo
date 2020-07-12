@@ -91,6 +91,12 @@ used by the MapBasic tool to select and export data for partners.
 	<value>Exportformat</value>
   </ExportColumn>
 
+  <!-- The name of the column in the partner GIS layer indicating which SQL table should be
+       used for that partner -->
+  <SQLTableColumn>
+	<value>SQLTable</value>
+  </SQLTableColumn>
+
   <!-- The name of the column in the partner GIS layer indicating which SQL files should be
        created for each partner -->
   <SQLFilesColumn>
@@ -149,6 +155,11 @@ used by the MapBasic tool to select and export data for partners.
   <DefaultClearLogFile>
 		<value>Yes</value>
   </DefaultClearLogFile>
+
+  <!-- By default, should centroids be used for selecting records? -->
+  <DefaultUseCentroids>
+	<value>No</value>
+  </DefaultUseCentroids>
 
   <!-- The path to the Universal Translator program -->
   <UTPath>

@@ -3,6 +3,7 @@
 '*
 '* Copyright © 2013, 2015 Greenspace Information for Greater London (GiGL)
 '* Copyright © 2015 Andy Foy Consulting
+'* Copyright © 2020 GiGL
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -429,7 +430,7 @@ Function GetUserID() As String
 
 End Function
 
-Function MonthNumToShortName( ByVal iMonthNo As Integer ) As String
+Function MonthNumToShortName(ByVal iMonthNo As Integer) As String
 '*************************************************
 '* Converts a month number to a short name
 '* eg 3 -> Mar
@@ -460,6 +461,44 @@ Function MonthNumToShortName( ByVal iMonthNo As Integer ) As String
 			MonthNumToShortName = "Nov"
 		Case 12
 			MonthNumToShortName = "Dec"
+	End Case
+	
+End Function
+
+Function MonthNumToQuarter(ByVal iMonthNo As Integer) As String
+'*************************************************
+'* Converts a month number to a financial
+'* quarter, eg 3 -> Q4
+'*************************************************
+
+	Do Case iMonthNo
+		Case 1, 2, 3
+			MonthNumToQuarter = "Q4"
+		Case 4, 5, 6
+			MonthNumToQuarter = "Q1"
+		Case 7, 8, 9
+			MonthNumToQuarter = "Q2"
+		Case 10, 11, 12
+			MonthNumToQuarter = "Q3"
+	End Case
+	
+End Function
+
+Function MonthNumToFinancialYear(ByVal iMonthNo As Integer, ByVal iYear As Integer) As String
+'*************************************************
+'* Converts a month and year to a financial
+'* year, eg 3, 2020 -> 19-20
+'*************************************************
+
+	Do Case iMonthNo
+		Case 1, 2, 3
+			MonthNumToFinancialYear = Format$(iYear - 1, "00") + "-" + Format$(iYear, "00")
+		Case 4, 5, 6
+			MonthNumToFinancialYear = Format$(iYear, "00") + "-" + Format$(iYear + 1, "00")
+		Case 7, 8, 9
+			MonthNumToFinancialYear = Format$(iYear, "00") + "-" + Format$(iYear + 1, "00")
+		Case 10, 11, 12
+			MonthNumToFinancialYear = Format$(iYear, "00") + "-" + Format$(iYear + 1, "00")
 	End Case
 	
 End Function
@@ -520,4 +559,90 @@ Done:
 CatchEx:
    Note Error$()
    Resume Done
+End Function
+
+Public Function GetFileDateTime(ByVal FileName As String,
+        ByVal NoGMTConvert As Logical) As String
+'*************************************************
+' GetFileDateTime
+' This function returns the Last Modified date/time
+' of the specified file name. It returns "" if an error occurred.
+'*************************************************
+
+	Dim FileHandle As Integer
+	Dim Res As Integer
+	Dim ErrNum As Integer
+	Dim ErrText As String
+	Dim tCreatedFileTime As FileTime
+	Dim tAccessedFileTime As FileTime
+	Dim tModifiedFileTime As FileTime
+	Dim tLocalTime As FileTime
+	Dim tSystemTime As SYSTEMTIME
+	Dim ResultTime As String
+	Dim secAttr as Integer
+	
+	' Ensure the file exists.
+	If Not FileExists(FileName) Then
+	    GetFileDateTime = ""
+	    Exit Function
+	End If
+	
+	' Here, we use CreateFile to open the existing file
+	' named in FileName.  The OPEN_EXISTING flag indicates
+	' that we are opening an existing flag.
+	FileHandle = CreateFile(FileName, GENERIC_READ, FILE_SHARE_READ, secAttr, OPEN_EXISTING, 0, 0)
+	
+	If FileHandle = INVALID_HANDLE_VALUE Then
+	    ' An error occurred.
+	    GetFileDateTime = ""
+	    Exit Function
+	End If
+	
+	' Call the GetFileTime function.
+	Res = GetFileTime(
+	    FileHandle,
+	    tCreatedFileTime,
+	    tAccessedFileTime,
+	    tModifiedFileTime)
+	
+	If Res = 0 Then
+	    ' An error occurred
+	    GetFileDateTime = ""
+	    Exit Function
+	End If
+	
+	' Convert the FileTime (GMT) to LocalFileTime)
+	' if NoGMTConvert is omitted or False.
+	If NoGMTConvert = False Then
+	    Res = FileTimeToLocalFileTime(tModifiedFileTime, tLocalTime)
+	Else
+	    ' We are NOT converting from GMT.
+	    tLocalTime.dwHighDateTime = tModifiedFileTime.dwHighDateTime
+	    tLocalTime.dwLowDateTime = tModifiedFileTime.dwLowDateTime
+	    Res = 2
+	End If
+	
+	If Res = 0 Then
+	    ' An error occurred
+	    GetFileDateTime = ""
+	    Exit Function
+	End If
+	
+	' Convert the FileTime to SystemTime
+	Res = FileTimeToSystemTime(tLocalTime, tSystemTime)
+	If Res = 0 Then
+	    ' An error occurred
+	    GetFileDateTime = ""
+	    Exit Function
+	End If
+	
+	' Convert from Local to string
+	ResultTime = tSystemTime.wYear + Format$(tSystemTime.wMonth, "00") + Format$(tSystemTime.wDay, "00") + "_" +
+		Format$(tSystemTime.wHour, "00") + Format$(tSystemTime.wMinute, "00") + Format$(tSystemTime.wSecond, "00")
+	
+	' Close the file
+	Res = CloseHandle(FileHandle)
+	
+	GetFileDateTime = ResultTime
+
 End Function
