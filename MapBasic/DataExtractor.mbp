@@ -4,4 +4,4 @@ Module=DataExtractor.mbo
 Module=GenFunctions.mbo
 Module=TranslateToSHP.mbo
 Module=XMLFunctions.mbo
-Module=MIMenu32.mbo
+Module=MIMenu64.mbo

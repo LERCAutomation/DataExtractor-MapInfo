@@ -32,13 +32,13 @@ Include "MapBasic.def"
 Include "Menu.def"
 Include "Icons.def"
 
-Include "XMLMenu32.def"
-Include "Windows32.def"
+'Include "XMLMenu32.def"
+'Include "Windows32.def"
 
-'Include "IMapInfoPro.def"
-'Include "Enums.def"
-'Include "XMLMenu64.def"
-'Include "Windows64.def"
+Include "IMapInfoPro.def"
+Include "Enums.def"
+Include "XMLMenu64.def"
+Include "Windows64.def"
 
 '-------------------------------------------------
 ' Define the custom variable types
@@ -275,7 +275,8 @@ Declare Function UploadtoServer(sEasyLoaderCommand As String,
 	sFileDSN As String,
 	sTabFileName As String,
 	sRemoteTableName As String,
-	sSwitches As String) As Integer
+	sSwitches As String,
+	sQuotes As String) As Integer
 Declare Function GetFileDateTime(ByVal FileName As String,
         ByVal NoGMTConvert As Logical) As String
 
@@ -445,6 +446,7 @@ Global sUTCommand As String
 Global sEasyLoaderPath As String
 Global sEasyLoaderCommand As String
 Global sEasyLoaderSwitches As String
+Global sEasyLoaderQuotes As String
 Global sDefaultEasyLoader As String
 Global sDefaultClearLogFile As String
 

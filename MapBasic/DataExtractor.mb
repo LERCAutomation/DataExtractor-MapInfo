@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.6.06
+'* DataExtractor v1.6.07
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,12 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - April 2020
+'* Last revised:    Andy Foy - August 2020
+'*
+'* *****************  Version 1.6.07  ***************
+'* Author: Andy Foy		Date: 13/08/2020
+'* A. Enable EasyLoader to work in both 32bit and 64bit
+'*    versions of MapInfo.
 '*
 '* *****************  Version 1.6.06  ***************
 '* Author: Andy Foy		Date: 21/05/2020
@@ -295,7 +300,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.6.06"
+	sVersion = "1.6.07"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -530,6 +535,9 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 
 					' Command for running EasyLoader program
 					sEasyLoaderCommand = GetSingleNodeValue(hXMLNode, "EasyLoaderCommand")
+
+					' Use quotes when running EasyLoader program
+					sEasyLoaderQuotes = GetSingleNodeValue(hXMLNode, "EasyLoaderQuotes")
 
 					' Switches for running EasyLoader program
 					sEasyLoaderSwitches = GetSingleNodeValue(hXMLNode, "EasyLoaderSwitches")
@@ -1652,7 +1660,7 @@ Sub CheckSelection
 		sPartnerTabFile = TableInfo(sPartnerTable, TAB_INFO_TABFILE)
 
 		Dim iSuccess As Integer
-		iSuccess = UploadToServer(sEasyLoaderCommand, sDefaultSchema, sUploadLogFile, sFileDSN, sPartnerTabFile, sPartnerTable, sEasyLoaderSwitches)
+		iSuccess = UploadToServer(sEasyLoaderCommand, sDefaultSchema, sUploadLogFile, sFileDSN, sPartnerTabFile, sPartnerTable, sEasyLoaderSwitches, sEasyLoaderQuotes)
 		
 		If iSuccess <> 0 Then
 			iErrorCount = iErrorCount + 1
@@ -1713,7 +1721,8 @@ Function UploadtoServer(sEasyLoaderCommand As String,
 	sFileDSN As String,
 	sTabFileName As String,
 	sRemoteTableName As String,
-	sSwitches As String) As Integer
+	sSwitches As String,
+	sQuotes As String) As Integer
 '*************************************************
 '* Routine to upload a MapInfo table name to
 '* a server
@@ -1723,12 +1732,21 @@ Function UploadtoServer(sEasyLoaderCommand As String,
 	' Create the upload command string
 	'-------------------------------------------------
 	Dim sUploadCmd as string
-	sUploadCmd = chr$(34) + sEasyLoaderCommand + chr$(34) +
-		" /B " + sSchema +
-		" /F " + sLogFile +
-		" /S " + "FILEDSN=" + sFileDSN +
-		" /T " + sTabFileName + ";" + sRemoteTableName +
-		" " + sSwitches
+	If UCase$(sQuotes) = "Y" then
+		sUploadCmd = chr$(34) + sEasyLoaderCommand + chr$(34) +
+			" /B " + sSchema +
+			" /F " + chr$(34) + sLogFile + chr$(34) +
+			" /S " + chr$(34) + "FILEDSN=" + sFileDSN + chr$(34) +
+			" /T " + chr$(34) + sTabFileName + ";" + sRemoteTableName + chr$(34) +
+			" " + sSwitches
+	Else
+		sUploadCmd = chr$(34) + sEasyLoaderCommand + chr$(34) +
+			" /B " + sSchema +
+			" /F " + sLogFile +
+			" /S " + "FILEDSN=" + sFileDSN +
+			" /T " + sTabFileName + ";" + sRemoteTableName +
+			" " + sSwitches
+	End If
 
 	'-------------------------------------------------
 	' Execute the command and wait for it to finish
@@ -2192,6 +2210,8 @@ Sub SelectSQL (sPartnerName As String,
 	sLocalTable = StringReplace(sLocalTable, "%mmm%", sDateMMM)
 	sLocalTable = StringReplace(sLocalTable, "%yy%", sDateYY)
 	sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
+	sLocalTable = StringReplace(sLocalTable, "%qq%", sDateQQ)
+	sLocalTable = StringReplace(sLocalTable, "%ffff%", sDateFFFF)
 
 	Dim iWaitCount As Integer
 	iWaitCount = 0
