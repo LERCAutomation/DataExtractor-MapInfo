@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.6.07
+'* DataExtractor v1.6.08
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,13 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - August 2020
+'* Last revised:    Andy Foy - November 2020
+'*
+'* *****************  Version 1.6.08  ***************
+'* Author: Andy Foy		Date: 13/08/2020
+'* A. Fix bug not cleaning up SQL tempoary tables.
+'* B. Use partner name not short name when selecting
+'*    map files.
 '*
 '* *****************  Version 1.6.07  ***************
 '* Author: Andy Foy		Date: 13/08/2020
@@ -300,7 +306,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.6.07"
+	sVersion = "1.6.08"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1448,6 +1454,7 @@ Sub CheckSelection
 	iExtractTot = 0
 	iExtractCnt = 0
 	sLastPartnerName = ""
+	sLastSQLTable = ""
 
 	'-------------------------------------------------
 	' Set the date variables
@@ -1843,14 +1850,14 @@ Sub ProcessExtracts
 	sPartnerPath = StringReplace(sPartnerPath, "%ffff%", sDateFFFF)
 
 	'-------------------------------------------------
-	' If this is a new partner ...
+	' If this is a new partner or a different SQL table ...
 	'-------------------------------------------------
-	If sPartnerName <> sLastPartnerName Then
+	If sPartnerName <> sLastPartnerName Or sTableName <> sLastSQLTable Then
 
 		'-------------------------------------------------
 		' Cleanup after the last partner
 		'-------------------------------------------------
-		If sTableName <> "" Then
+		If sLastSQLTable <> "" And sLastPartnerName <> "" Then
 		
 			'-------------------------------------------------
 			' Connect to the SQL Server database
@@ -1867,8 +1874,9 @@ Sub ProcessExtracts
 			' the temporary SQL table
 			'-------------------------------------------------
 			Dim nStmt3 As Integer
+			Call MyPrint("Cleaning up after last partner ...")
 			nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
-			+ "', '" + sTableName + "', '" + sUser + "'")
+			+ "', '" + sLastSQLTable + "', '" + sUser + "'")
 		
 			'-------------------------------------------------
 			' Close the results
@@ -1963,6 +1971,9 @@ Sub ProcessExtracts
 
 			Call MyPrint("Spatial selection complete.")
 
+			' Save the last SQL table name
+			sLastSQLTable = sTableName
+
 			'-------------------------------------------------
 			' Close the results
 			'-------------------------------------------------
@@ -2056,47 +2067,49 @@ NextExtract:
 	'-------------------------------------------------
 	iExtractCnt = iExtractCnt + 1
 	If iExtractCnt > iExtractTot Then
+	
+CleanUp:
+		'-------------------------------------------------
+		' Trap any errors
+		'-------------------------------------------------
+		OnError Goto ErrorTrap
+	
+		'-------------------------------------------------
+		' Cleanup after the final extract
+		'-------------------------------------------------
+		If sLastSQLTable <> "" Then
+		
+			'-------------------------------------------------
+			' Connect to the SQL Server database
+			'-------------------------------------------------
+			nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
+			If nConn = 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Unable to connect to SQL Server!")
+				Exit Sub
+			End If 
+		
+			'-------------------------------------------------
+			' Execute a SQL Server stored procedure to delete
+			' the temporary SQL table
+			'-------------------------------------------------
+			Call MyPrint("Cleaning up after last partner ...")
+			nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
+			+ "', '" + sLastSQLTable + "', '" + sUser + "'")
+		
+			'-------------------------------------------------
+			' Close the results
+			'-------------------------------------------------
+			Server nStmt3 Close
+	
+		End If
+	
 		'-------------------------------------------------
 		' Halt processing
 		'-------------------------------------------------
 		ProgressBar = -1
 	End If
 
-CleanUp:
-	'-------------------------------------------------
-	' Trap any errors
-	'-------------------------------------------------
-	OnError Goto ErrorTrap
-
-	'-------------------------------------------------
-	' Cleanup after the final extract
-	'-------------------------------------------------
-	If sTableName <> "" And iExtractCnt > iExtractTot Then
-	
-		'-------------------------------------------------
-		' Connect to the SQL Server database
-		'-------------------------------------------------
-		nConn = Server_Connect("ODBC","FILEDSN=" + sFileDSN)
-		If nConn = 0 Then
-			iErrorCount = iErrorCount + 1
-			Call MyPrint("Error: Unable to connect to SQL Server!")
-			Exit Sub
-		End If 
-	
-		'-------------------------------------------------
-		' Execute a SQL Server stored procedure to delete
-		' the temporary SQL table
-		'-------------------------------------------------
-		nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
-		+ "', '" + sTableName + "', '" + sUser + "'")
-	
-		'-------------------------------------------------
-		' Close the results
-		'-------------------------------------------------
-		Server nStmt3 Close
-
-	End If
-	
 ExitSub:
 	Exit Sub
 
@@ -3155,7 +3168,7 @@ SelectRecords:
 
 		Call MyPrint("Order by clause is ... " + sMapOrderClause)
 
-		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sShortColumn + ") = " + Chr$(34) + sShortName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
+		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sPartnerColumn + ") = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 		Run Command (sCmd)
 	Else
 		'-------------------------------------------------

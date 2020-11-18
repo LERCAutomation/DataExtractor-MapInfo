@@ -494,5 +494,6 @@ Global sDateQQ As String
 Global sDateFFFF As String
 
 Global sLastPartnerName As String
+Global sLastSQLTable As String
 
 Global iErrorCount as Integer
