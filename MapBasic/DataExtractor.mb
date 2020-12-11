@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.6.08
+'* DataExtractor v1.6.09
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,13 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - November 2020
+'* Last revised:    Andy Foy - December 2020
+'*
+'* *****************  Version 1.6.09  ***************
+'* Author: Andy Foy		Date: 04/12/2020
+'* A. Wrap Where clause in brackets when exclusion clause
+'*    is applied.
+'* B. Specify input SQL table in log.
 '*
 '* *****************  Version 1.6.08  ***************
 '* Author: Andy Foy		Date: 13/08/2020
@@ -306,7 +312,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.6.08"
+	sVersion = "1.6.09"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -635,6 +641,7 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					hXMLFilesNode = MIXMLGetNextNode(hXMLFilesNodeList)
 
 					'-------------------------------------------------
+
 					' Loop through all the attributes in the node list
 					' storing the table names and columns and in arrays
 					'-------------------------------------------------
@@ -1943,6 +1950,7 @@ Sub ProcessExtracts
 			Dim iUseCentroids As Integer
 			If bUseCentroids = True Then
 				iUseCentroids = 1
+
 			Else
 				iUseCentroids = 0
 			End If
@@ -1953,7 +1961,7 @@ Sub ProcessExtracts
 			' partner boundary
 			'-------------------------------------------------
 			Dim nStmt1 As Integer
-			Call MyPrint("Executing spatial selection ...")
+			Call MyPrint("Executing spatial selection from '" + sTableName + "' ...")
 
 			'-------------------------------------------------
 			' Connect to the SQL Server database
@@ -2295,6 +2303,7 @@ Sub SelectSQL (sPartnerName As String,
 	sLocalPath = StringReplace(sLocalPath, "%mmm%", sDateMMM)
 	sLocalPath = StringReplace(sLocalPath, "%yy%", sDateYY)
 	sLocalPath = StringReplace(sLocalPath, "%yyyy%", sDateYYYY)
+
 	sLocalPath = StringReplace(sLocalPath, "%qq%", sDateQQ)
 	sLocalPath = StringReplace(sLocalPath, "%ffff%", sDateFFFF)
 
@@ -2328,7 +2337,7 @@ Sub SelectSQL (sPartnerName As String,
 		If sSQLWhereClause = "" Then
 			sSQLWhereClause = sExclusionClause
 		Else
-			sSQLWhereClause = sExclusionClause & " And " & sSQLWhereClause
+			sSQLWhereClause = sExclusionClause & " AND (" & sSQLWhereClause & ")"
 		End If
 	End If
 
