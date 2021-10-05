@@ -1,7 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012 - 2020 TVERC, GiGL, SBIC
+'* Copyright © 2012 - 2021 TVERC, GiGL, SBIC, Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.6.09
+'* DataExtractor v1.7.03
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,27 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - December 2020
+'* Last revised:    Andy Foy - October 2021
+'*
+'* *****************  Version 1.7.03  ***************
+'* Author: Andy Foy		Date: 01/10/2021
+'* A. Enable separate output folders for shp, tab, 
+'*    csv and txt files.
+'*
+'* *****************  Version 1.7.02  ***************
+'* Author: Andy Foy		Date: 19/02/2021
+'* A. Fix bug calculating record length.
+'*
+'* *****************  Version 1.7.01  ***************
+'* Author: Andy Foy		Date: 28/12/2020
+'* A. Add debug option for log file.
+'* B. Standardise log file with ArcGIS version.
+'* C. Add option to set where clause for which partners
+'*    to display.
+'* D. Output macro errors to log file.
+'* E. Wait for macros to complete before continuing.
+'* F. Only upload partner table to SQL Server if SQL
+'*    outputs have been selected.
 '*
 '* *****************  Version 1.6.09  ***************
 '* Author: Andy Foy		Date: 04/12/2020
@@ -312,7 +332,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.6.09"
+	sVersion = "1.7.03"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -460,6 +480,15 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' Load the default values from the child nodes
 					' under the DataExtractor node
 					'-------------------------------------------------
+					' Whether to include debug messages in the logfile
+					Dim sDebug As String
+					sDebug = GetSingleNodeValue(hXMLNode, "Debug")
+					If UCase$(sDebug) = "YES" OR UCase$(sDebug) = "Y" Then
+						bDebug = True
+					Else
+						bDebug = False
+					End If
+
 					' File path for for storing the log file
 					sLogFilePath = GetSingleNodeValue(hXMLNode, "LogFilePath")
 					sLogFileName = sLogFilePath & "\DataExtractor_" & sUserID & ".log"
@@ -472,6 +501,18 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 
 					' The output sub-folder in which each partner files will be created
 					sPartnerFolder = GetSingleNodeValue(hXMLNode, "PartnerFolder")
+
+					' The output sub-folder into which MapInfo files will be saved
+					sMapInfoFolder = GetSingleNodeValue(hXMLNode, "MapInfoFolder")
+
+					' The output sub-folder into which ArcGIS files will be saved
+					sArcGISFolder = GetSingleNodeValue(hXMLNode, "ArcGISFolder")
+
+					' The output sub-folder into which CSV files will be saved
+					sCSVFolder = GetSingleNodeValue(hXMLNode, "CSVFolder")
+
+					' The output sub-folder into which TXT files will be saved
+					sTXTFolder = GetSingleNodeValue(hXMLNode, "TXTFolder")
 
 					' Default database schema to use in the remote SQL database
 					sDefaultSchema = GetSingleNodeValue(hXMLNode, "DatabaseSchema")
@@ -512,6 +553,9 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' Name of column of spatial geometry in the partner table
 					sSpatialColumn = GetSingleNodeValue(hXMLNode, "SpatialColumn")
 
+					' The where clause to determine which partners to display
+					sPartnerClause = GetSingleNodeValue(hXMLNode, "PartnerClause")
+
 					' The options for the selection types
 					sSelectTypeOptions = GetSingleNodeValue(hXMLNode, "SelectTypeOptions")
 
@@ -530,7 +574,7 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' SQL clause for excluding records
 					sExclusionClause = GetSingleNodeValue(hXMLNode, "ExclusionClause")
 
-					' Default setting for exclusing records
+					' Default setting for excluding records
 					sDefaultExclusion = GetSingleNodeValue(hXMLNode, "DefaultExclusion")
 
 					' Default option to clear log file
@@ -715,8 +759,6 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 
 	iSuccess = SetCurrentDirectory(sLogFilePath)
 	if iSuccess = 0 Then
-		'Call MyPrint("Creating log file path '" + sLogFilePath + "'")
-		'iSuccess = CreateDirectory(sLogFilePath , iSecurity)
 		iSuccess = SHCreateDirectoryEx(0, sLogFilePath, iSecurity)
 		if iSuccess <> 0 Then
 			Call MyPrint("Error creating log file path")
@@ -727,12 +769,19 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 	End If
 
 	'-------------------------------------------------
+	' Set the default partner where clause
+	'-------------------------------------------------
+	If sPartnerClause = "" Then
+		sPartnerClause = sActiveColumn + " = " + Chr$(34) + "Y" + Chr$(34)
+	End If
+
+	'-------------------------------------------------
 	' Build the SQL used to list the partner names
 	' from the partner MapInfo table
 	'-------------------------------------------------
 	sPartnerListSQL = "Select " + sPartnerColumn + ", " + sShortColumn + ", " + sNotesColumn + ", " + sFormatColumn + ", " + sExportColumn + ", " + sSQLTableColumn + ", " + sSQLFilesColumn +  ", " + sMapFilesColumn + 
 		" From " + sPartnerTable +
-		" Where " + sActiveColumn + " = " + Chr$(34) + "Y" + Chr$(34) + " Or " + sActiveColumn + " = " + Chr$(34) + "y" + Chr$(34) + 
+		" Where " + sPartnerClause + 
 		" Order By " + sPartnerColumn +
 		" Into QryPartners NoSelect"
 
@@ -1377,9 +1426,9 @@ Sub PartnerList_Handler
 		iPartner = ReadControlValue(TriggerControl())
 		Note Partners(iPartner).Name + " (" + Partners(iPartner).Short + ")" +
 		Chr$(10) + Chr$(10) + "GIS Format : " + Partners(iPartner).Formats +
-		Chr$(10) + "Export Format : " + Partners(iPartner).Exports +
-		Chr$(10) + "SQL Table : " + Partners(iPartner).SQLTable +
-		Chr$(10) + "Notes : " + Partners(iPartner).Notes
+		Chr$(10) + Chr$(10) + "Export Format : " + Partners(iPartner).Exports +
+		Chr$(10) + Chr$(10) + "SQL Table : " + Partners(iPartner).SQLTable +
+		Chr$(10) + Chr$(10) + "Notes : " + Partners(iPartner).Notes
 	End If
 
 End Sub
@@ -1397,7 +1446,8 @@ Sub SQLTables_Handler
 		iSQLItem = ReadControlValue(TriggerControl())
 		Note SQLFiles(iSQLItem).Node +
 		Chr$(10) + Chr$(10) + "Output Name : " + SQLFiles(iSQLItem).OutputName +
-		Chr$(10) + "Where Clause : " + SQLFiles(iSQLItem).WhereClause
+		Chr$(10) + Chr$(10) + "Where Clause : " + SQLFiles(iSQLItem).WhereClause +
+		Chr$(10) + Chr$(10) + "Order By Clause : " + SQLFiles(iSQLItem).OrderClause
 	End If
 
 End Sub
@@ -1415,7 +1465,8 @@ Sub MapTables_Handler
 		iMapItem = ReadControlValue(TriggerControl())
 		Note OpenMaps(iMapItem).Node + " (" + OpenMaps(iMapItem).TableName + ")" +
 		Chr$(10) + Chr$(10) + "Output Name : " + OpenMaps(iMapItem).OutputName +
-		Chr$(10) + "Where Clause : " + OpenMaps(iMapItem).WhereClause
+		Chr$(10) + Chr$(10) + "Where Clause : " + OpenMaps(iMapItem).WhereClause +
+		Chr$(10) + Chr$(10) + "Order By Clause : " + OpenMaps(iMapItem).OrderClause
 	End If
 
 End Sub
@@ -1460,6 +1511,8 @@ Sub CheckSelection
 	'-------------------------------------------------
 	iExtractTot = 0
 	iExtractCnt = 0
+	iSQLTotal = 0
+	iMapTotal = 0
 	sLastPartnerName = ""
 	sLastSQLTable = ""
 
@@ -1521,6 +1574,7 @@ Sub CheckSelection
 			' Increment the counter
 			'-------------------------------------------------
 			iExtractTot = iExtractTot + 1
+			iSQLTotal = iSQLTotal + 1
 
 			ProcessSelected(iExtractTot).Node = SQLFiles(iSQLTable).Node
 			ProcessSelected(iExtractTot).TableName = Partners(iPartner).SQLTable
@@ -1549,6 +1603,7 @@ Sub CheckSelection
 			' Increment the counter
 			'-------------------------------------------------
 			iExtractTot = iExtractTot + 1
+			iMapTotal = iMapTotal + 1
 
 			ProcessSelected(iExtractTot).Node = OpenMaps(iMapTable).Node
 			ProcessSelected(iExtractTot).TableName = OpenMaps(iMapTable).TableName
@@ -1648,9 +1703,9 @@ Sub CheckSelection
 		Call MyPrint("Applying exclusion clause ... " + sExclusionClause)
 	End If
 	If bUseCentroids = True Then
-		Call MyPrint("Selecting polygons by centroids ...")
+		Call MyPrint("Selecting features using centroids ...")
 	Else
-		Call MyPrint("Selecting polygons by geometry ...")
+		Call MyPrint("Selecting features using boundaries ...")
 	End If
 	Call MyPrint("Performing selection type '" + iSelectType + "' ...")
 	Call MyPrint("")
@@ -1661,9 +1716,10 @@ Sub CheckSelection
 	iErrorCount = 0
 
 	'-------------------------------------------------
-	' Upload the partner table to the server
+	' Upload the partner table to the server if
+	' requested and there are SQL tables to extract
 	'-------------------------------------------------
-	if bUploadToServer = True Then
+	if bUploadToServer = True And iSQLTotal > 0 Then
 		Dim sLogFileSql As String
 		sLogFileSql = "EasyLoader" + "_" + sUserID
 
@@ -1716,16 +1772,16 @@ Sub CheckSelection
 	End If
 
 	'-------------------------------------------------
-	' Display the log file in the message window
-	'-------------------------------------------------
-	Call PrintLogFile
-
-	'-------------------------------------------------
-	' Report the number of file access errors
+	' Report the number of errors
 	'-------------------------------------------------
 	If iErrorCount > 0 then
 		Note "There were errors during this process. Please check the log for details."
 	End If
+
+	'-------------------------------------------------
+	' Display the log file in the message window
+	'-------------------------------------------------
+	Call PrintLogFile
 
 End Sub
 
@@ -1773,6 +1829,7 @@ Function UploadtoServer(sEasyLoaderCommand As String,
 	End if
 
 	Call MyPrint("Upload to server complete.")
+	Call MyPrint("")
 	UploadToServer = 0
 	
 End Function
@@ -1835,31 +1892,32 @@ Sub ProcessExtracts
 	End If
 
 	'-------------------------------------------------
-	' Set the output sub-folder
+	' Set the main output sub-folder
 	'-------------------------------------------------
-	Dim sPartnerPath As String
 	If sPartnerFolder = "" Then
-		sPartnerPath = sShortName
-	Else
-		sPartnerPath = sPartnerFolder
+		sPartnerFolder = sShortName
 	End If
 
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
-	sPartnerPath = StringReplace(sPartnerPath, "%partner%", sShortName)
-	sPartnerPath = StringReplace(sPartnerPath, "%dd%", sDateDD)
-	sPartnerPath = StringReplace(sPartnerPath, "%mm%", sDateMM)
-	sPartnerPath = StringReplace(sPartnerPath, "%mmm%", sDateMMM)
-	sPartnerPath = StringReplace(sPartnerPath, "%yy%", sDateYY)
-	sPartnerPath = StringReplace(sPartnerPath, "%qq%", sDateQQ)
-	sPartnerPath = StringReplace(sPartnerPath, "%yyyy%", sDateYYYY)
-	sPartnerPath = StringReplace(sPartnerPath, "%ffff%", sDateFFFF)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%partner%", sShortName)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%dd%", sDateDD)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%mm%", sDateMM)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%mmm%", sDateMMM)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%yy%", sDateYY)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%qq%", sDateQQ)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%yyyy%", sDateYYYY)
+	sPartnerFolder = StringReplace(sPartnerFolder, "%ffff%", sDateFFFF)
 
 	'-------------------------------------------------
 	' If this is a new partner or a different SQL table ...
 	'-------------------------------------------------
-	If sPartnerName <> sLastPartnerName Or sTableName <> sLastSQLTable Then
+	'If sPartnerName <> sLastPartnerName Or sTableName <> sLastSQLTable Then
+	'-------------------------------------------------
+	' If this is a new partner ...
+	'-------------------------------------------------
+	If sPartnerName <> sLastPartnerName Then
 
 		'-------------------------------------------------
 		' Cleanup after the last partner
@@ -1881,7 +1939,9 @@ Sub ProcessExtracts
 			' the temporary SQL table
 			'-------------------------------------------------
 			Dim nStmt3 As Integer
-			Call MyPrint("Cleaning up after last partner ...")
+			If bDebug Then
+				Call MyPrint("Cleaning up after last partner ...")
+			End If
 			nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
 			+ "', '" + sLastSQLTable + "', '" + sUser + "'")
 		
@@ -1899,7 +1959,7 @@ Sub ProcessExtracts
 			' partner if required
 			'-------------------------------------------------
 			If bZipFiles Then
-				If ZipFiles(sDefaultPath, sPartnerPath) > 1 Then
+				If ZipFiles(sDefaultPath, sPartnerFolder) > 1 Then
 					iErrorCount = iErrorCount + 1
 					Call MyPrint("Error: Zipping extract files for partner.")
 				End If
@@ -1914,19 +1974,26 @@ Sub ProcessExtracts
 		Call MyPrint("----------------------------------------------------------------------")
 		Call MyPrint("Processing partner '" + sPartnerName + " (" + sShortName + ")' ...")
 
+		' Save the last partner name
+		sLastPartnerName = sPartnerName
+
+		'-------------------------------------------------
+		' Set the local path
+		'-------------------------------------------------
+		sLocalPath = sDefaultPath + "\" + sPartnerFolder
+	
 		'-------------------------------------------------
 		' Create the partner directory path if it doesn't
 		' already exist
 		'-------------------------------------------------
 		Dim iSuccess, iSecurity As Integer
-		Dim sLocalPath As String
 		iSecurity = 0
-		sLocalPath = sDefaultPath + "\" + sPartnerPath
 
 		iSuccess = SetCurrentDirectory(sLocalPath)
 		if iSuccess = 0 Then
-			Call MyPrint("Creating output directory path '" + sLocalPath + "'")
-			'iSuccess = CreateDirectory(sLocalPath , iSecurity)
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sLocalPath + "'.")
+			End If
 			iSuccess = SHCreateDirectoryEx(0, sLocalPath, iSecurity)
 			if iSuccess <> 0 Then
 				iErrorCount = iErrorCount + 1
@@ -1936,13 +2003,67 @@ Sub ProcessExtracts
 			End If
 		End If
 
-		' Save the last partner name
-		sLastPartnerName = sPartnerName
-
+		'-------------------------------------------------
+		' Set the output sub-folder
+		'-------------------------------------------------
+		If sMapInfoFolder = "" Then
+			sMapInfoPath = sLocalPath
+		Else
+			sMapInfoPath = sLocalPath + "\" + sMapInfoFolder
+		End If
+		If sArcGISFolder = "" Then
+			sArcGISPath = sLocalPath
+		Else
+			sArcGISPath = sLocalPath + "\" + sArcGISFolder
+		End If
+		If sCSVFolder = "" Then
+			sCSVPath = sLocalPath
+		Else
+			sCSVPath = sLocalPath + "\" + sCSVFolder
+		End If
+		If sTXTFolder = "" Then
+			sTXTPath = sLocalPath
+		Else
+			sTXTPath = sLocalPath + "\" + sTXTFolder
+		End If
+	
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		iSuccess = SetCurrentDirectory(sMapInfoPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sMapInfoPath + "'.")
+			End If
+			iSuccess = SHCreateDirectoryEx(0, sMapInfoPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
+	
 		'-------------------------------------------------
 		' Check the partner requires some SQL files
 		'-------------------------------------------------
 		If sTableType = "SQL" And sFiles <> "" and sTableName <> "" Then
+
+			'-------------------------------------------------
+			' Check the SQL Table is valid
+			'-------------------------------------------------
+			Dim bTableFound As Logical
+			Dim i As Integer
+			For i = 1 to UBound(SQLTablesList())
+				If sTableName = SQLTablesList(i) Then
+					bTableFound = True
+				End If
+			Next
+			
+			If bTableFound = False Then
+				Call MyPrint("Skipping output = '" + sNodeName + "' - table '" + sTableName + "' not found.")
+				Goto NextExtract
+			End If
 
 			'-------------------------------------------------
 			' Set the use centroids parameter
@@ -2013,6 +2134,7 @@ Sub ProcessExtracts
 			End If
 
 			Call MyPrint("" + FormatNumber$(iRecTotal) + " records selected.")
+			Call MyPrint("")
 
 			'-------------------------------------------------
 			' Close the results
@@ -2052,7 +2174,7 @@ Sub ProcessExtracts
 		' partner if required
 		'-------------------------------------------------
 		If bZipFiles Then
-			If ZipFiles(sDefaultPath, sPartnerPath) > 1 Then
+			If ZipFiles(sDefaultPath, sPartnerFolder) > 1 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Zipping extract files for partner.")
 			End If
@@ -2101,7 +2223,9 @@ CleanUp:
 			' Execute a SQL Server stored procedure to delete
 			' the temporary SQL table
 			'-------------------------------------------------
-			Call MyPrint("Cleaning up after last partner ...")
+			If bDebug Then
+				Call MyPrint("Cleaning up after last partner ...")
+			End If
 			nStmt3 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFClearSppSubset '" + sDefaultSchema
 			+ "', '" + sLastSQLTable + "', '" + sUser + "'")
 		
@@ -2175,14 +2299,13 @@ Sub SelectSQL (sPartnerName As String,
 '	Call MyPrint("sSQLMacro = " + sSQLMacro)
 '	Call MyPrint("sSQLMacroParm = " + sSQLMacroParm)
 
+	Call MyPrint("Processing output '" + sNodeName + "' ...")
+
 	'-------------------------------------------------
 	' Check the partner requires something
 	'-------------------------------------------------
-	If UCase$(sExport) = "" And
-		((UCase$(sFormat) <> "SHP" And
-		UCase$(sFormat) <> "TAB" And
-		UCase$(sFormat) <> "BOTH") Or
-		sSQLFiles = "") Then
+	If (sFormat = "" And sExport = "" And sOutputType = "") Or
+		(sSQLFiles = "") Then
 		Call MyPrint("Skipping output = '" + sNodeName + "' - not required.")
 		Exit Sub
 	End If
@@ -2193,19 +2316,18 @@ Sub SelectSQL (sPartnerName As String,
 	End If
 
 	'-------------------------------------------------
-	' Check the SQL Table is valid
+	' Override the output format if required
 	'-------------------------------------------------
-	Dim bTableFound As Logical
-	Dim i As Integer
-	For i = 1 to UBound(SQLTablesList())
-		If sTableName = SQLTablesList(i) Then
-			bTableFound = True
+	If sOutputType = "" Then
+		sOutputType = sFormat
+	Else
+		' Override the output type it it's a recognised format
+		If UCase$(sOutputType) = "TAB" Or UCase$(sOutputType) = "SHP" Or UCase$(sOutputType) = "BOTH" Then
+			Call MyPrint("Overriding the output type with '" + sOutputType + "' ...")
+		Else
+			' Otherwise don't keep an output file
+			sOutputType = ""
 		End If
-	Next
-	
-	If bTableFound = False Then
-		Call MyPrint("Skipping output = '" + sNodeName + "' - table '" + sTableName + "' not found.")
-		Goto ExitSub
 	End If
 
 	'-------------------------------------------------
@@ -2213,11 +2335,8 @@ Sub SelectSQL (sPartnerName As String,
 	' table record then process it, otherwise skip
 	' to the next SQL clause.
 	'-------------------------------------------------
-	Dim sLocalTable as String
-	If Instr(1, UCase$(sSQLFiles), UCase$(sNodeName)) > 0
-	Or UCase$(sSQLFiles) = "ALL" Then
-		sLocalTable = sOutputName
-	Else
+	If Instr(1, UCase$(sSQLFiles), UCase$(sNodeName)) = 0
+	And UCase$(sSQLFiles) <> "ALL" Then
 		Call MyPrint("Skipping output = '" + sNodeName + "' - not required.")
 		Goto ExitSub
 	End If
@@ -2225,6 +2344,8 @@ Sub SelectSQL (sPartnerName As String,
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
+	Dim sLocalTable as String
+	sLocalTable = sOutputName
 	sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
 	sLocalTable = StringReplace(sLocalTable, "%dd%", sDateDD)
 	sLocalTable = StringReplace(sLocalTable, "%mm%", sDateMM)
@@ -2256,8 +2377,6 @@ Sub SelectSQL (sPartnerName As String,
 		sUser = Left$(sUser, Maximum(31 - Len(sTableName), 0))
 	End If
 
-	Call MyPrint("Processing output = '" + sNodeName + "' ...")
-
 	'-------------------------------------------------
 	' Trap any connection errors
 	'-------------------------------------------------
@@ -2283,29 +2402,6 @@ Sub SelectSQL (sPartnerName As String,
 	'-------------------------------------------------
 	Dim sSQLTable As String
 	sSQLTable = sTableName + "_" + sUser
-
-	'-------------------------------------------------
-	' Set the local path
-	'-------------------------------------------------
-	Dim sLocalPath As String
-	If sPartnerFolder = "" Then
-		sLocalPath = sDefaultPath + "\" + sShortName
-	Else
-		sLocalPath = sDefaultPath + "\" + sPartnerFolder
-	End If
-
-	'-------------------------------------------------
-	' Replace any variables
-	'-------------------------------------------------
-	sLocalPath = StringReplace(sLocalPath, "%partner%", sShortName)
-	sLocalPath = StringReplace(sLocalPath, "%dd%", sDateDD)
-	sLocalPath = StringReplace(sLocalPath, "%mm%", sDateMM)
-	sLocalPath = StringReplace(sLocalPath, "%mmm%", sDateMMM)
-	sLocalPath = StringReplace(sLocalPath, "%yy%", sDateYY)
-	sLocalPath = StringReplace(sLocalPath, "%yyyy%", sDateYYYY)
-
-	sLocalPath = StringReplace(sLocalPath, "%qq%", sDateQQ)
-	sLocalPath = StringReplace(sLocalPath, "%ffff%", sDateFFFF)
 
 	'-------------------------------------------------
 	' Set the temporary table names
@@ -2342,7 +2438,7 @@ Sub SelectSQL (sPartnerName As String,
 	End If
 
     If sSQLWhereClause = "" Then
-        Call MyPrint("No where clause was used")
+        Call MyPrint("No where clause is specified.")
    	Else
 		Call MyPrint("Where clause is ... " + sSQLWhereClause)
 		sSQLWhereClause = "Where " & sSQLWhereClause
@@ -2351,7 +2447,11 @@ Sub SelectSQL (sPartnerName As String,
 	'-------------------------------------------------
 	' Set the SQL group by and order by clause
 	'-------------------------------------------------
-	Call MyPrint("Order by clause is ... " + sSQLOrderClause)
+    If sSQLOrderClause = "" Then
+        Call MyPrint("No order by clause is specified.")
+   	Else
+		Call MyPrint("Order by clause is ... " + sSQLOrderClause)
+	End If
 
 	'-------------------------------------------------
 	' Count the number of records that have been
@@ -2393,7 +2493,9 @@ Sub SelectSQL (sPartnerName As String,
 	' and close it if it is
 	'-------------------------------------------------
 	If TableIsOpen(sTempTable) Then
-		Call MyPrint("Closing temporary table ...")
+		If bDebug Then
+			Call MyPrint("Closing temporary table ...")
+		End If
 		Close Table sTempTable
 	End If
 
@@ -2402,7 +2504,9 @@ Sub SelectSQL (sPartnerName As String,
 	' and close it if it is
 	'-------------------------------------------------
 	If TableIsOpen(sLocalTable) Then
-		Call MyPrint("Closing local table ...")
+		If bDebug Then
+			Call MyPrint("Closing local table ...")
+		End If
 		Close Table sLocalTable
 	End If
 
@@ -2411,7 +2515,7 @@ Sub SelectSQL (sPartnerName As String,
 	' temporary table (to check the record length)
 	'-------------------------------------------------
 	Dim sSQLStmt As String
-	sSQLStmt = "Select Top(0) " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause
+	sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause + " AND (1 = 0)"
 
 	'-------------------------------------------------
 	' Link the SQL table as a temporary table
@@ -2419,10 +2523,12 @@ Sub SelectSQL (sPartnerName As String,
 LinkTemp:
 	OnError Goto TempError
 	
-	Call MyPrint("Linking dummy table ...")
+	If bDebug Then
+		Call MyPrint("Linking dummy table ...")
+	End If
 	
 	Dim sCmd As String
-	sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sLocalPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
+	sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sMapInfoPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
 	Run Command (sCmd)
 
 	OnError Goto ErrorTrap
@@ -2437,8 +2543,18 @@ LinkTemp:
 	' Unlink the temporary table to leave the local
 	' table as a regular standalone table
 	'-------------------------------------------------
-	Call MyPrint("Unlinking dummy table ...")
+	If bDebug Then
+		Call MyPrint("Unlinking dummy table ...")
+	End If
 	Unlink sTableAlias
+
+	'-------------------------------------------------
+	' Check if the table contains an Obj column
+	' which indicates if there is any spatial data
+	'-------------------------------------------------
+	If Not TableInfo(sTableAlias, TAB_INFO_MAPPABLE) Then
+		Call MyPrint("Data is not spatial.")
+	End If
 
 	'-------------------------------------------------
 	' If the table contains a MI_STYLE column
@@ -2466,7 +2582,9 @@ LinkTemp:
 	' Drop the dummy table
 	'-------------------------------------------------
 	If TableIsOpen(sTableAlias) Then
-		Call MyPrint("Dropping dummy table ...")
+		If bDebug Then
+			Call MyPrint("Dropping dummy table ...")
+		End If
 		Drop Table sTableAlias
 	End If
 
@@ -2476,12 +2594,14 @@ LinkTemp:
 	If iRowLength > 4096 Then
 
 		iErrorCount = iErrorCount + 1
-		Call MyPrint("Record length exceeds maximum of 4,096 bytes - selection cancelled.")
+		Call MyPrint("Error: Record length exceeds maximum of 4,096 bytes - selection cancelled.")
 
 		Exit Sub
 
 	Else
-		Call MyPrint("Total record length = " + FormatNumber$(iRowLength) + " bytes")
+		If bDebug Then
+			Call MyPrint("Total record length = " + FormatNumber$(iRowLength) + " bytes")
+		End If
 	End If
 
 	'-------------------------------------------------
@@ -2491,12 +2611,12 @@ LinkTemp:
 	iDataSize = ((iRowLength * iRecTotal) / 1024) + 1
 
 	If iDataSize > (1024 * 1024) Then
-		Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / (1024 * 1024), 0.01)) + " Gb)")
+		Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / (1024 * 1024), 0.01)) + " Gb).")
 	Else
 		If iDataSize > 1024 Then
-			Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / 1024, 0.01)) + " Mb)")
+			Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb (" + FormatNumber$(Round(iDataSize / 1024, 0.01)) + " Mb).")
 		Else
-			Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb")
+			Call MyPrint("Total data size = " + FormatNumber$(iDataSize) + " Kb.")
 		End If
 	End If
 
@@ -2506,7 +2626,7 @@ LinkTemp:
 	If iDataSize > (2*1024*1024) Then
 
 		iErrorCount = iErrorCount + 1
-		Call MyPrint("Total data size exceeds maximum of 2 Gb - selection cancelled.")
+		Call MyPrint("Error: Total data size exceeds maximum of 2 Gb - selection cancelled.")
 
 		Exit Sub
 
@@ -2524,9 +2644,11 @@ LinkTemp:
 LinkTable:
 	OnError Goto LinkError
 	
-	Call MyPrint("Linking temporary table ...")
+	If bDebug Then
+		Call MyPrint("Linking temporary table ...")
+	End If
 	
-	sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sLocalPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
+	sCmd = "Server " + nConn + " Link Table " + Chr$(34) + sSQLStmt + Chr$(34) + " Toolkit " + Chr$(34) + "ODBC" + Chr$(34) + " Into " + sTempTable + " File " + Chr$(34) + sMapInfoPath + "\" + sLocalTable + Chr$(34) + " Autokey Off ReadOnly"
 	Run Command (sCmd)
 
 	OnError Goto ErrorTrap
@@ -2540,7 +2662,9 @@ LinkTable:
 	' Unlink the temporary table to leave the local
 	' table as a regular standalone table
 	'-------------------------------------------------
-	Call MyPrint("Unlinking temporary table ...")
+	If bDebug Then
+		Call MyPrint("Unlinking temporary table ...")
+	End If
 	Unlink sTableAlias
 
 	'-------------------------------------------------
@@ -2549,9 +2673,8 @@ LinkTable:
 	'-------------------------------------------------
 	Dim bSpatialData As Logical
 	bSpatialData = True
-	'If ColumnExists(sTableAlias, "Obj") Then
 	If Not TableInfo(sTableAlias, TAB_INFO_MAPPABLE) Then
-		Call MyPrint("Table does not contain spatial data")
+		Call MyPrint("Data is not spatial.")
 		bSpatialData = False
 	End If
 
@@ -2571,13 +2694,15 @@ LinkTable:
 		Alter Table sTableAlias (Drop MI_PRINX)
 	End If
 
+	Call MyPrint("Extract complete.")
+
 	'-------------------------------------------------
 	' Override the export format if required
 	'-------------------------------------------------
 	Dim sExportType As String
 	sExportType = sExport
 	If UCase$(sOutputType) = "CSV" Or UCase$(sOutputType) = "TXT" Then
-		Call MyPrint("Overriding the export type ...")
+		Call MyPrint("Overriding the export type with '" + sOutputType + "' ...")
 		sExportType = sOutputType
 	End If
 
@@ -2589,12 +2714,32 @@ ExportTable:
 	
 	If UCase$(sExportType) = "CSV" Then
 
-		Call MyPrint("Exporting as a CSV ...")
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		Dim iSuccess, iSecurity As Integer
+		iSecurity = 0
+	
+		iSuccess = SetCurrentDirectory(sCSVPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sCSVPath + "'.")
+			End If
+			iSuccess = SHCreateDirectoryEx(0, sCSVPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
+	
+		Call MyPrint("Exporting as a CSV file ...")
 
 		Set ProgressBars Off
 
 		Export sTableAlias
-			Into sLocalPath + "\" + sLocalTable + ".csv"
+			Into sCSVPath + "\" + sLocalTable + ".csv"
 			Type "ASCII"
 			Delimiter ","
 			CharSet "WindowsLatin1"
@@ -2603,26 +2748,57 @@ ExportTable:
 
 		Set ProgressBars On
 
+		Call MyPrint("Export complete.")
+
 		'-------------------------------------------------
 		' Post-process the export file (if required)
 		'-------------------------------------------------
 		If sSQLMacro <> "" Then
 			Call MyPrint("Processing the export file ...")
-			sCmd = "Run Program " + Chr$(34) + "wscript.exe " +  + Chr$(34) + Chr$(34) + sSQLMacro + Chr$(34) + Chr$(34)
-				+ " " + Chr$(34) + Chr$(34) + sSQLMacroParm + Chr$(34) + Chr$(34)
-				+ " " + Chr$(34) + Chr$(34) + sLocalPath + Chr$(34) + Chr$(34)
-				+ " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
-			Run Command (sCmd)
+			
+			sCmd = "wscript.exe " + Chr$(34) + sSQLMacro + Chr$(34)
+				+ " " + Chr$(34) + sSQLMacroParm + Chr$(34)
+				+ " " + Chr$(34) + sCSVPath + Chr$(34)
+				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
+				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+
+			Dim intRC As Integer
+			intRC = ExecuteAndWait(sCmd)
+			If intRC > 1 Then
+				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
+			ElseIf intRC > 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
+			End if
+			
+			Call MyPrint("Processing complete.")
 		End If
 
 	ElseIf UCase$(sExportType) = "TXT" Then
 
-		Call MyPrint("Exporting as a TXT ...")
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		iSuccess = SetCurrentDirectory(sTXTPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sTXTPath + "'.")
+			End If
+			iSuccess = SHCreateDirectoryEx(0, sTXTPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
+	
+		Call MyPrint("Exporting as a TXT file ...")
 
 		Set ProgressBars Off
 
 		Export sTableAlias
-			Into sLocalPath + "\" + sLocalTable + ".txt"
+			Into sTXTPath + "\" + sLocalTable + ".txt"
 			Type "ASCII"
 			Delimiter ","
 			CharSet "WindowsLatin1"
@@ -2630,36 +2806,34 @@ ExportTable:
 
 		Set ProgressBars On
 
+		Call MyPrint("Export complete.")
+
 		'-------------------------------------------------
 		' Post-process the export file (if required)
 		'-------------------------------------------------
 		If sSQLMacro <> "" Then
 			Call MyPrint("Processing the export file ...")
-			sCmd = "Run Program " + Chr$(34) + "wscript.exe " +  + Chr$(34) + Chr$(34) + sSQLMacro + Chr$(34) + Chr$(34)
-				+ " " + Chr$(34) + Chr$(34) + sSQLMacroParm + Chr$(34) + Chr$(34)
-				+ " " + Chr$(34) + Chr$(34) + sLocalPath + Chr$(34) + Chr$(34)
-				+ " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
-			Run Command (sCmd)
+			
+			sCmd = "wscript.exe " + Chr$(34) + sSQLMacro + Chr$(34)
+				+ " " + Chr$(34) + sSQLMacroParm + Chr$(34)
+				+ " " + Chr$(34) + sTXTPath + Chr$(34)
+				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
+				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+
+			intRC = ExecuteAndWait(sCmd)
+			If intRC > 1 Then
+				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
+			ElseIf intRC > 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
+			End if
+			
+			Call MyPrint("Processing complete.")
 		End If
 
 	End If
 
 	OnError Goto ErrorTrap
-
-	'-------------------------------------------------
-	' Override the output format if required
-	'-------------------------------------------------
-	If sOutputType = "" Then
-		sOutputType = sFormat
-	Else
-		' Override the output type it it's a recognised format
-		If UCase$(sOutputType) = "TAB" Or UCase$(sOutputType) = "SHP" Or UCase$(sOutputType) = "BOTH" Then
-			Call MyPrint("Overriding the output type ...")
-		Else
-			' Otherwise don't keep an output file
-			sOutputType = ""
-		End If
-	End If
 
 	'-------------------------------------------------
 	' Translate the table to ESRI shapefile if required
@@ -2668,10 +2842,30 @@ ExportTable:
 		Dim sLogFilePath As String, sLogFileShp As String
 		sLogFilePath = PathToDirectory$(sLogFileName)
 		sLogFileShp = "TabToShp" + "_" + sUserID
+		
+		Dim sInputPath As String
+		
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		iSuccess = SetCurrentDirectory(sArcGISPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sArcGISPath + "'.")
+			End If
+			iSuccess = SHCreateDirectoryEx(0, sArcGISPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
 
-		'Call MyPrint("Log File Path = '" + sLogFilePath + "'")
-
-		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalTable)
+		'-------------------------------------------------
+		' Translate the table
+		'-------------------------------------------------
+		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sMapInfoPath, sLocalTable, sArcGISPath)
 	End If
 
 	'-------------------------------------------------
@@ -2691,8 +2885,6 @@ ExportTable:
 			' Check if the temporary table is open
 			'-------------------------------------------------
 			If TableIsOpen(sTableAlias) Then
-
-				Call MyPrint("Setting symbology in table ...")
 
 				Set ProgressBars Off
 
@@ -2715,7 +2907,9 @@ ExportTable:
 				'-------------------------------------------------
 				Set Table sTableAlias FastEdit Off
 
-				Call MyPrint("Closing the MapInfo table ...")
+				If bDebug Then
+					Call MyPrint("Closing the MapInfo table ...")
+				End If
 				Close Table sTableAlias
 
 			End If
@@ -2727,7 +2921,9 @@ ExportTable:
 		' check if the local table is open and drop it
 		'-------------------------------------------------
 		If TableIsOpen(sTableAlias) Then
-			Call MyPrint("Dropping the MapInfo table ...")
+			If bDebug Then
+				Call MyPrint("Dropping the MapInfo table ...")
+			End If
 			Drop Table sTableAlias
 		End If
 	End If
@@ -2879,6 +3075,10 @@ Sub SetSymbology(sNodeName as String, sTableName As String)
 					i = 0
 					Do while hXMLSymbolNode
 						
+						If i = 0 Then
+							Call MyPrint("Setting symbology in table ...")
+						End If
+						
 						'-------------------------------------------------
 						' Close the temporary NewStyle table if it is
 						' already/still open in the current MapInfo session
@@ -2921,7 +3121,9 @@ Sub SetSymbology(sNodeName as String, sTableName As String)
 						Dim iRows As Integer
 						iRows = TableInfo(NewStyle, TAB_INFO_NROWS)
 
-						Call MyPrint("Setting " + sObject + " style for " + FormatNumber$(iRows) + " rows where ... " + sClause)
+						If bDebug Then
+							Call MyPrint("Setting " + sObject + " style for " + FormatNumber$(iRows) + " rows where ... " + sClause)
+						End If
 
 						'-------------------------------------------------
 						' If any rows were selected then set the styles
@@ -2968,6 +3170,10 @@ Sub SetSymbology(sNodeName as String, sTableName As String)
 						hXMLSymbolNode = MIXMLGetNextNode(hXMLSymbolNodeList)
 
 					Loop
+					
+					If i > 0 Then
+						Call MyPrint("Symbology complete.")
+					End If
 
 				End If
 
@@ -3064,39 +3270,46 @@ Sub SelectMaps (sPartnerName As String,
 
 	OnError Goto ErrorTrap
 
+	Call MyPrint("Processing output '" + sNodeName + "' ...")
+
 	'-------------------------------------------------
 	' Check the partner requires something
 	'-------------------------------------------------
-	If UCase$(sExport) = "" And
-		((UCase$(sFormat) <> "SHP" And
-		UCase$(sFormat) <> "TAB" And
-		UCase$(sFormat) <> "BOTH") Or
-		sMapFiles = "") Then
+	If (sFormat = "" And sExport = "" And sOutputType = "") Or
+		(sMapFiles = "") Then
 		Call MyPrint("Skipping output = '" + sNodeName + "' - not required.")
 		Exit Sub
+	End If
+
+	'-------------------------------------------------
+	' Override the output format if required
+	'-------------------------------------------------
+	Dim sFormatType As String
+	sFormatType = sFormat
+	If UCase$(sOutputType) = "TAB" Or UCase$(sOutputType) = "SHP" Or UCase$(sOutputType) = "BOTH" Then
+		Call MyPrint("Overriding the output type with '" & sOutputType & "' ...")
+		sFormatType = sOutputType
+	Else
+		' Otherwise don't keep an output file
+		If sOutputType <> "" Then
+			sFormatType = ""
+		End If
 	End If
 
 	'-------------------------------------------------
 	' If this Map table is found in the partner
 	' table record then process it, otherwise skip it
 	'-------------------------------------------------
-	If Instr(1, Ucase$(sMapFiles), Ucase$(sNodeName)) = 0 then
+	If Instr(1, Ucase$(sMapFiles), Ucase$(sNodeName)) = 0
+	AND UCase$(sMapFiles) <> "ALL" Then
 		Call MyPrint("Skipping output = '" + sNodeName + "' - not required.")
-		Exit Sub
+		Goto ExitSub
 	End If
-
-	Call MyPrint("Processing output = '" + sNodeName + "' ...")
 
 	'-------------------------------------------------
 	' Set the local and temporary table names
 	'-------------------------------------------------
-	Dim sLocalPath, sLocalTable, sTempTable As String
-	If sPartnerFolder = "" Then
-		sLocalPath = sDefaultPath + "\" + sShortName
-	Else
-		sLocalPath = sDefaultPath + "\" + sPartnerFolder
-	End If
-
+	Dim sLocalTable, sTempTable As String
 	sLocalTable = sOutputName
 	
 	sTempTable = Left$("T" + sTableName + "_" + sShortName, 31)
@@ -3105,15 +3318,6 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
-	sLocalPath = StringReplace(sLocalPath, "%partner%", sShortName)
-	sLocalPath = StringReplace(sLocalPath, "%dd%", sDateDD)
-	sLocalPath = StringReplace(sLocalPath, "%mm%", sDateMM)
-	sLocalPath = StringReplace(sLocalPath, "%mmm%", sDateMMM)
-	sLocalPath = StringReplace(sLocalPath, "%yy%", sDateYY)
-	sLocalPath = StringReplace(sLocalPath, "%yyyy%", sDateYYYY)
-	sLocalPath = StringReplace(sLocalPath, "%qq%", sDateQQ)
-	sLocalPath = StringReplace(sLocalPath, "%ffff%", sDateFFFF)
-	
 	sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
 	sLocalTable = StringReplace(sLocalTable, "%dd%", sDateDD)
 	sLocalTable = StringReplace(sLocalTable, "%mm%", sDateMM)
@@ -3136,7 +3340,9 @@ Sub SelectMaps (sPartnerName As String,
 	' and close it if it is
 	'-------------------------------------------------
 	If TableIsOpen(sTempTable) Then
-		Call MyPrint("Closing temporary table ...")
+		If bDebug Then
+			Call MyPrint("Closing temporary table ...")
+		End If
 		Close Table sTempTable
 	End If
 
@@ -3168,14 +3374,20 @@ SelectRecords:
 		'-------------------------------------------------
 		Call MyPrint("Executing spatial selection ...")
 
+		Call MyPrint("Columns clause is ... " + sMapColumns)
+
 		If sMapWhereClause = "" Then
-	        Call MyPrint("No where clause was used")
+	        Call MyPrint("No where clause is specified.")
        	Else
 			Call MyPrint("Where clause is ... " + sMapWhereClause)
 			sMapWhereClause = " And " + sMapWhereClause
 		End If
 
-		Call MyPrint("Order by clause is ... " + sMapOrderClause)
+		If sMapOrderClause = "" Then
+	        Call MyPrint("No order by clause is specified.")
+       	Else
+			Call MyPrint("Order by clause is ... " + sMapOrderClause)
+		End If
 
 		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sPartnerColumn + ") = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 		Run Command (sCmd)
@@ -3186,14 +3398,21 @@ SelectRecords:
 		'-------------------------------------------------
 		Call MyPrint("Executing non-spatial selection ...")
 
+		Call MyPrint("Columns clause is ... " + sMapColumns)
+
 		If sMapWhereClause = "" Then
-	        Call MyPrint("No where clause was used")
+	        Call MyPrint("No where clause is specified")
        	Else
 			Call MyPrint("Where clause is ... " + sMapWhereClause)
 			sMapWhereClause = " Where " + sMapWhereClause
 		End If
 
-		Call MyPrint("Order by clause is ... " + sMapOrderClause)
+		If sMapOrderClause = "" Then
+	        Call MyPrint("No order by clause is specified.")
+       	Else
+			Call MyPrint("Order by clause is ... " + sMapOrderClause)
+		End If
+
 		sCmd = "Select " + sMapColumns + " From " + sTableName + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 		Run Command (sCmd)
 	End If
@@ -3214,7 +3433,9 @@ SelectRecords:
 	If iRecTotal > iRecMax Then
 		Call MyPrint("Record count exceeds maximum of " + iRecMax + " - extract skipped.")
 		If TableIsOpen(sTempTable) Then
-			Call MyPrint("Closing the MapInfo table ...")
+			If bDebug Then
+				Call MyPrint("Closing the MapInfo table ...")
+			End If
 			Close Table sTempTable
 		End If
 		Exit Sub
@@ -3226,7 +3447,9 @@ SelectRecords:
 	If iRecTotal = 0 Then
 		Call MyPrint("No records found - extract skipped.")
 		If TableIsOpen(sTempTable) Then
-			Call MyPrint("Closing the MapInfo table ...")
+			If bDebug Then
+				Call MyPrint("Closing the MapInfo table ...")
+			End If
 			Close Table sTempTable
 		End If
 		Exit Sub
@@ -3237,12 +3460,14 @@ SelectRecords:
 	'-------------------------------------------------
 	' Save the local table
 	'-------------------------------------------------
-	Call MyPrint("Saving temporary table ...")
+	If bDebug Then
+		Call MyPrint("Saving temporary table ...")
+	End If
 
 SaveTable:
 	OnError Goto SaveError
 	
-	sCmd = "Commit Table " + sTempTable + " As " + Chr$(34) + sLocalPath + "\" + sLocalTable + ".tab" + Chr$(34) + " TYPE NATIVE Charset " + Chr$(34) + "WindowsLatin1" + Chr$(34)
+	sCmd = "Commit Table " + sTempTable + " As " + Chr$(34) + sMapInfoPath + "\" + sLocalTable + ".tab" + Chr$(34) + " TYPE NATIVE Charset " + Chr$(34) + "WindowsLatin1" + Chr$(34)
 	Run Command (sCmd)
 
 	OnError Goto ErrorTrap
@@ -3253,10 +3478,12 @@ SaveTable:
 	'-------------------------------------------------
 	Close Table sTempTable
 
+	Call MyPrint("Extract complete.")
+
 OpenTable:
 	OnError Goto OpenError
 	
-	sCmd = "Open Table " + Chr$(34) + sLocalPath + "\" + sLocalTable + ".tab" + Chr$(34) + " As " + sTempTable
+	sCmd = "Open Table " + Chr$(34) + sMapInfoPath + "\" + sLocalTable + ".tab" + Chr$(34) + " As " + sTempTable
 	Run Command (sCmd)
 
 ExportTable:
@@ -3275,79 +3502,128 @@ ExportTable:
 	'-------------------------------------------------
 	' Export the table as a text file if required
 	'-------------------------------------------------
-		If UCase$(sExportType) = "CSV" Then
+	If UCase$(sExportType) = "CSV" Then
 
-			Call MyPrint("Exporting as a CSV ...")
-
-			Set ProgressBars Off
-
-			Export sTempTable
-				Into sLocalPath + "\" + sLocalTable + ".csv"
-				Type "ASCII"
-				Delimiter ","
-				CharSet "WindowsLatin1"
-				Titles
-				Overwrite
-
-			Set ProgressBars On
-
-			'-------------------------------------------------
-			' Post-process the export file (if required)
-			'-------------------------------------------------
-			If sMapMacro <> "" Then
-				Call MyPrint("Processing the export file ...")
-				sCmd = "Run Program " + Chr$(34) + "wscript.exe " +  + Chr$(34) + Chr$(34) + sMapMacro + Chr$(34) + Chr$(34)
-					+ " " + Chr$(34) + Chr$(34) + sMapMacroParm + Chr$(34) + Chr$(34)
-					+ " " + Chr$(34) + Chr$(34) + sLocalPath + Chr$(34) + Chr$(34)
-					+ " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
-				Run Command (sCmd)
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		Dim iSuccess, iSecurity As Integer
+		iSecurity = 0
+	
+		iSuccess = SetCurrentDirectory(sCSVPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sCSVPath + "'.")
 			End If
-
-		ElseIf UCase$(sExportType) = "TXT" Then
-
-			Call MyPrint("Exporting as a TXT ...")
-
-			Set ProgressBars Off
-
-			Export sTempTable
-				Into sLocalPath + "\" + sLocalTable + ".txt"
-				Type "ASCII"
-				Delimiter ","
-				CharSet "WindowsLatin1"
-				Overwrite
-
-			Set ProgressBars On
-
-			'-------------------------------------------------
-			' Post-process the export file (if required)
-			'-------------------------------------------------
-			If sMapMacro <> "" Then
-				Call MyPrint("Processing the export file ...")
-				sCmd = "Run Program " + Chr$(34) + "wscript.exe " +  + Chr$(34) + Chr$(34) + sMapMacro + Chr$(34) + Chr$(34)
-					+ " " + Chr$(34) + Chr$(34) + sMapMacroParm + Chr$(34) + Chr$(34)
-					+ " " + Chr$(34) + Chr$(34) + sLocalPath + Chr$(34) + Chr$(34)
-					+ " " + Chr$(34) + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34) + Chr$(34) + Chr$(34)
-				Run Command (sCmd)
+			iSuccess = SHCreateDirectoryEx(0, sCSVPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
 			End If
-
 		End If
+	
+		Call MyPrint("Exporting as a CSV file ...")
+
+		Set ProgressBars Off
+
+		Export sTempTable
+			Into sCSVPath + "\" + sLocalTable + ".csv"
+			Type "ASCII"
+			Delimiter ","
+			CharSet "WindowsLatin1"
+			Titles
+			Overwrite
+
+		Set ProgressBars On
+
+		Call MyPrint("Export complete.")
+
+		'-------------------------------------------------
+		' Post-process the export file (if required)
+		'-------------------------------------------------
+		If sMapMacro <> "" Then
+			Call MyPrint("Processing the export file ...")
+			
+			sCmd = "wscript.exe " + Chr$(34) + sMapMacro + Chr$(34)
+				+ " " + Chr$(34) + sMapMacroParm + Chr$(34)
+				+ " " + Chr$(34) + sCSVPath + Chr$(34)
+				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
+				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+
+			Dim intRC As Integer
+			intRC = ExecuteAndWait(sCmd)
+			If intRC > 1 Then
+				Call MyPrint("Error: Problem processing the export file. RC = " + intRC)
+			ElseIf intRC > 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
+			End if
+			
+			Call MyPrint("Processing complete.")
+		End If
+
+	ElseIf UCase$(sExportType) = "TXT" Then
+
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		iSuccess = SetCurrentDirectory(sTXTPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sTXTPath + "'.")
+			End If
+			iSuccess = SHCreateDirectoryEx(0, sTXTPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
+	
+		Call MyPrint("Exporting as a TXT file ...")
+
+		Set ProgressBars Off
+
+		Export sTempTable
+			Into sTXTPath + "\" + sLocalTable + ".txt"
+			Type "ASCII"
+			Delimiter ","
+			CharSet "WindowsLatin1"
+			Overwrite
+
+		Set ProgressBars On
+
+		Call MyPrint("Export complete.")
+
+		'-------------------------------------------------
+		' Post-process the export file (if required)
+		'-------------------------------------------------
+		If sMapMacro <> "" Then
+			Call MyPrint("Processing the export file ...")
+			
+			sCmd = "wscript.exe " + Chr$(34) + sMapMacro + Chr$(34)
+				+ " " + Chr$(34) + sMapMacroParm + Chr$(34)
+				+ " " + Chr$(34) + sTXTPath + Chr$(34)
+				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
+				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+
+			intRC = ExecuteAndWait(sCmd)
+			If intRC > 1 Then
+				Call MyPrint("Error: Problem processing the export file. RC = " + intRC)
+			ElseIf intRC > 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
+			End if
+			
+			Call MyPrint("Processing complete.")
+		End If
+
+	End If
 
 	OnError Goto ErrorTrap
-
-	'-------------------------------------------------
-	' Override the output format if required
-	'-------------------------------------------------
-	Dim sFormatType As String
-	sFormatType = sFormat
-	If UCase$(sOutputType) = "TAB" Or UCase$(sOutputType) = "SHP" Or UCase$(sOutputType) = "BOTH" Then
-		Call MyPrint("Overriding the output type with '" & sOutputType & "' ...")
-		sFormatType = sOutputType
-	Else
-		' Otherwise don't keep an output file
-		If sOutputType <> "" Then
-			sFormatType = ""
-		End If
-	End If
 
 	'-------------------------------------------------
 	' Translate the table to ESRI shapefile if required
@@ -3357,7 +3633,27 @@ ExportTable:
 		sLogFilePath = PathToDirectory$(sLogFileName)
 		sLogFileShp = "TabToShp" + "_" + sUserID
 
-		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sLocalPath, sLocalTable)
+		'-------------------------------------------------
+		' Create the output path if it doesn't exist
+		'-------------------------------------------------
+		iSuccess = SetCurrentDirectory(sArcGISPath)
+		if iSuccess = 0 Then
+			If bDebug Then
+				Call MyPrint("Creating output path '" + sArcGISPath + "'.")
+			End If
+			iSuccess = SHCreateDirectoryEx(0, sArcGISPath, iSecurity)
+			if iSuccess <> 0 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Creating directory path")
+				Call MyPrint("Process terminated.")
+				Exit Sub
+			End If
+		End If
+
+		'-------------------------------------------------
+		' Translate the table
+		'-------------------------------------------------
+		Call TranslateToShapefile(sUTPath, sUTCommand, sLogFilePath, sLogFileShp, sMapInfoPath, sLocalTable, sArcGISPath)
 	End If
 
 	'-------------------------------------------------
@@ -3368,7 +3664,9 @@ ExportTable:
 		' Check if the local table is open and close it
 		'-------------------------------------------------
 		If TableIsOpen(sTempTable) Then
-			Call MyPrint("Closing the MapInfo table ...")
+			If bDebug Then
+				Call MyPrint("Closing the MapInfo table ...")
+			End If
 			Close Table sTempTable
 		End If
 	Else
@@ -3377,7 +3675,9 @@ ExportTable:
 		' drop (delete) the table
 		'-------------------------------------------------
 		If TableIsOpen(sTempTable) Then
-			Call MyPrint("Dropping the MapInfo table ...")
+			If bDebug Then
+				Call MyPrint("Dropping the MapInfo table ...")
+			End If
 			Drop Table sTempTable
 		End If
 	End If

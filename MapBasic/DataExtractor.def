@@ -1,7 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012 - 2020 GiGL, TVERC, SBIC
+'* Copyright © 2012 - 2021 TVERC, GiGL, SBIC, Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -213,8 +213,9 @@ Declare Sub TranslateToShapefile
 	sUTCommand As String,
 	sDefaultPath As String,
 	sTempName As String,
-	sLocalPath As String,
-	sLocalName As String)
+	sInputPath As String,
+	sLocalName As String,
+	sOutputPath As String)
 Declare Sub Wait
 	(ByVal iSeconds as Integer)
 Declare Sub GetXmlProfile
@@ -411,6 +412,7 @@ Declare Function MIGetErrorCode Lib MIWEBSERVICES_LIB_NAME
 Global sVersion As String
 Global sUserId As String
 Global sToolTitle As String
+Global bDebug As Logical
 
 Global iXMLFile As Integer
 Global sXMLFile As String
@@ -419,6 +421,17 @@ Global iDefaultXMLFile As Integer
 
 Global sDefaultPath As String
 Global sPartnerFolder As String
+Global sMapInfoFolder As String
+Global sArcGISFolder As String
+Global sCSVFolder As String
+Global sTXTFolder As String
+
+Global sLocalPath As String
+Global sMapInfoPath As String
+Global sArcGISPath As String
+Global sCSVPath As String
+Global sTXTPath As String
+
 Global sFileDSN As String
 Global sDefaultSchema As String
 Global sTableListSQL As String
@@ -434,6 +447,7 @@ Global sSQLFilesColumn As String
 Global sMapFilesColumn As String
 Global sTagsColumn As String
 Global sSpatialColumn As String
+Global sPartnerClause As String
 Global sSelectTypeOptions As String
 Global iDefaultSelectType As Integer
 Global iRecMax As Integer
@@ -477,6 +491,8 @@ Global iExtractCnt As Integer
 Global iPartner As Integer
 Global iSQLTable As Integer
 Global iMapTable As Integer
+Global iSQLTotal As Integer
+Global iMapTotal As Integer
 Global nConn As Integer
 Global bZipFiles As Logical
 Global bApplyExclusion As Logical

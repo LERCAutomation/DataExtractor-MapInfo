@@ -1,8 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2013 Greenspace Information for Greater London (GiGL)
-'* Copyright © 2015 Andy Foy Consulting
+'* Copyright © 2012 - 2021 TVERC, GiGL, SBIC, Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -50,7 +49,7 @@
 '***************************************************************
 Include "DataExtractor.def"
 
-Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath As String, sTempName As String, sLocalPath As String, sLocalName As String)
+Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath As String, sTempName As String, sInputPath As String, sLocalName As String, sOutputPath As String)
 '*************************************************
 '* Routine to translate a MapInfo table name
 '* passed in the call into an ESRI shapefile
@@ -62,23 +61,21 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 	' Set the current directory to the Universal
 	' Translator directory
 	'-------------------------------------------------
-	Call MyPrint("Switching to Universal Translator directory ... " + sUTPath)
+	If bDebug Then
+		Call MyPrint("Switching to Universal Translator directory ... " + sUTPath)
+	End If
 
 	'Call SetUTDirectory(ProgramDirectory$()+ "UT\")
 	Call SetUTDirectory(sUTPath)
 	
 	Dim sInputFile as string
 	Dim sMappingFile as string
-	Dim sResultDir as string
 	Dim sLogFile as string
 	
-	If Right$(sLocalPath, 1) = "\" Then
-		sInputFile = sLocalPath + sLocalName + ".TAB"
-		'sResultDir = Left$(sLocalPath, Len(sLocalPath) - 1)
-		sResultDir = sLocalPath + "ArcGIS"
+	If Right$(sInputPath, 1) = "\" Then
+		sInputFile = sInputPath + sLocalName + ".TAB"
 	Else
-		sInputFile = sLocalPath + "\" + sLocalName + ".TAB"
-		sResultDir = sLocalPath + "\" + "ArcGIS"
+		sInputFile = sInputPath + "\" + sLocalName + ".TAB"
 	End if
 
 	If Right$(sDefaultPath, 1) = "\" Then
@@ -99,7 +96,9 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 	Dim iMIVersion As Integer
 	iMIVersion = SystemInfo(SYS_INFO_MIVERSION)
 	
-	Call MyPrint("Current MapInfo version is ... " + iMIVersion)
+	If bDebug Then
+		Call MyPrint("Current MapInfo version is ... " + iMIVersion)
+	End If
 
 	'-------------------------------------------------
 	' Create the mapping file command string
@@ -122,7 +121,7 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 		" --SourceSourceDataset " + 
 		chr$(34) + sInputFile + chr$(34) + " " +
 		" --DestDestDataset " + 
-		chr$(34) + sResultDir + chr$(34) + " "
+		chr$(34) + sOutputPath + chr$(34) + " "
 	End if
 
 	sMUTGenerate = sMUTGenerate +
@@ -133,7 +132,9 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 	'-------------------------------------------------
 	' Execute the command and wait for it to finish
 	'-------------------------------------------------
-	Call MyPrint("Creating Universal Translator mapping file ...")
+	If bDebug Then
+		Call MyPrint("Creating Universal Translator mapping file ...")
+	End If
 
 	If ExecuteAndWait(sMUTGenerate) > 0 then
 		Call MyPrint("Error creating Mapping file - process terminated.")
@@ -157,12 +158,14 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 		" --HOMOGENOUS_GEOMETRY Yes" +
 		" --_SHAPE_FILE_TYPE 2d" +
 		" --SourceDataset " + chr$(34) + sInputFile + chr$(34) +
-		" --DestDataset " + chr$(34) + sResultDir + chr$(34) +
+		" --DestDataset " + chr$(34) + sOutputPath + chr$(34) +
 		" --_EXTENSION TAB" + 
 		" --_BASENAME " + sLocalName +
 		" --_FULLBASENAME " + sLocalName
 
-	Call MyPrint("Amending Mapping file ...")
+	If bDebug Then
+		Call MyPrint("Amending Mapping file ...")
+	End If
 	Call AmendMappingFile(sMappingFile)
 
 	'-------------------------------------------------
@@ -173,7 +176,9 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 		'-------------------------------------------------
 		' Execute the command and wait for it to finish
 		'-------------------------------------------------
-		Call MyPrint("Executing Universal Translator ...")
+		If bDebug Then
+			Call MyPrint("Executing Universal Translator ...")
+		End If
 
 		If ExecuteAndWait(sMUTRunCmd) > 0 then
 			Call MyPrint("Error translating to SHP file - process terminated.")
@@ -186,7 +191,7 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 		Exit Sub
 	End if
 
-	Call MyPrint("Translation to a SHP file complete.")
+	Call MyPrint("Translation complete.")
 	
 End Sub
 

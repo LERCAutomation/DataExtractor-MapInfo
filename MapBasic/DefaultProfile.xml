@@ -23,6 +23,11 @@ used by the MapBasic tool to select and export data for partners.
 <configuration>
 <DataExtractor>
 
+  <!-- Whether to include debug messages in the logfile -->
+  <Debug>
+	<value>No</value>
+  </Debug>
+
   <!-- The existing file location where log files will be saved with output messages -->
   <LogFilePath>
 	<value>D:\LRCs\GiGL\Data Exchange\Logs</value>
@@ -38,6 +43,11 @@ used by the MapBasic tool to select and export data for partners.
 	<value>D:\LRCs\GiGL\Data Exchange\Extracts</value>
   </DefaultPath>
 
+  <!-- The output sub-folder in which each partner's file will be created -->
+  <PartnerFolder>
+	<value>%partner%_DataExchange_%qq%_%ffff%</value>
+  </PartnerFolder>
+
   <!-- The schema used in the SQL Server database -->
   <DatabaseSchema>
 	<value>dbo</value>
@@ -46,12 +56,12 @@ used by the MapBasic tool to select and export data for partners.
   <!-- The SQL statement used to list all the tables in SQL Server that can be selected
        by the user to extract for each partner -->
   <TableListSQL>
-	<value>Select table_name From information_schema.tables Where table_name Like 'GiGL[_]Spp[_]%' And table_name Not Like 'GiGL[_]Spp[_]%[_]%' Order By table_name</value>
+	<value>Select table_name From information_schema.tables Where table_name Like 'LERC[_]Spp[_]%' And table_name Not Like 'LERC[_]Spp[_]%[_]%' Order By table_name</value>
   </TableListSQL>
 
   <!-- The name of the partner GIS layer in SQL Server used to select the records -->
   <PartnerTable>
-	<value>CombinedExtractPolygons</value>
+	<value>ExtractPolygons</value>
   </PartnerTable>
 
   <!-- The name of the column in the partner GIS layer containing the partner name passed to SQL
@@ -120,6 +130,11 @@ used by the MapBasic tool to select and export data for partners.
 	<value>SP_GEOMETRY</value>
   </SpatialColumn>
 
+  <!-- The where clause to determine which partners to display -->
+  <PartnerClause>
+	<value>Active = "Y"</value>
+  </PartnerClause>
+
   <!-- The options for the selection types -->
   <SelectTypeOptions>
 	<value>Spatial Only;Survey Tags Only;Spatial and Survey Tags</value>
@@ -141,22 +156,22 @@ used by the MapBasic tool to select and export data for partners.
 	<value>No</value>
   </DefaultZip>
 
-  <!-- The SQL criteria for excluding any confidential species records -->
-  <ConfidentialClause>
+  <!-- The SQL criteria for excluding any records (so that these don't appear in the outputs)-->
+  <ExclusionClause>
 	<value>R6SURVEY &lt;&gt; 'Battersea Park - Birds' AND R6SURVEY &lt;&gt; 'Battersea Park Nature Reserve'</value>
-  </ConfidentialClause>
+  </ExclusionClause>
 
-  <!-- The default value for extracting confidential surveys. Leave blank to hide option in dialog. -->
-  <DefaultConfidential>
-	<value>No</value>
-  </DefaultConfidential>
+  <!-- The default value for excluding any records. Leave blank to hide option in dialog. -->
+  <DefaultExclusion>
+	<value></value>
+  </DefaultExclusion>
 
-  <!-- By default, should an existing log file be cleared? -->
+  <!-- By default, should an existing log file be cleared? Leave blank to hide option in dialog. -->
   <DefaultClearLogFile>
 		<value>Yes</value>
   </DefaultClearLogFile>
 
-  <!-- By default, should centroids be used for selecting records? -->
+  <!-- By default, should centroids be used for selecting records? Leave blank to hide option in dialog. -->
   <DefaultUseCentroids>
 	<value>No</value>
   </DefaultUseCentroids>
@@ -168,7 +183,7 @@ used by the MapBasic tool to select and export data for partners.
 
   <!-- The command to run the Universal Translator program -->
   <UTCommand>
-	<value>Imut.exe</value>
+	<value>Fme.exe</value>
   </UTCommand>
 
   <!-- The command to run the EasyLoader program -->
@@ -178,7 +193,7 @@ used by the MapBasic tool to select and export data for partners.
 
   <!-- The switches to run the EasyLoader program -->
   <EasyLoaderSwitches>
-	<value>/E /F /K /P R /Q /Y</value>
+	<value>/E /F /K /P R /Q /Y /NoUI</value>
   </EasyLoaderSwitches>
 
   <!-- By default, should the EasyLoader program be run? -->
@@ -189,9 +204,9 @@ used by the MapBasic tool to select and export data for partners.
   <!-- The table columns and SQL where clauses used to select all the required columns for
 	the extract tables -->
   <SQLTables>
-	<GiGL_AllSpp>
+	<AllSppPoint>
 		<OutputName>
-			<Value>GiGL_Species_All_%partner%</Value>
+			<Value>Species_All_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -226,10 +241,10 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_AllSpp>
+	</AllSppShort>
 	<DesignatedSpp>
 		<OutputName>
-			<Value>GiGL_Species_Designated_%partner%</Value>
+			<Value>Species_Designated_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -265,9 +280,9 @@ used by the MapBasic tool to select and export data for partners.
 			</Symbol>
 		</Symbology>
 	</DesignatedSpp>
-	<GiGL_LISISpp>
+	<INNSSpp>
 		<OutputName>
-			<Value>GiGL_Species_LISI_%partner%</Value>
+			<Value>Species_INNS_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -299,10 +314,10 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_LISISpp>
-	<GiGL_Birds>
+	</INNSSpp>
+	<Birds>
 		<OutputName>
-			<Value>GiGL_Species_Birds_%partner%</Value>
+			<Value>Species_Birds_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -334,10 +349,10 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_Birds>
-	<GiGL_SppAbsence>
+	</Birds>
+	<SppAbsence>
 		<OutputName>
-			<Value>GiGL_Species_Absence_%partner%</Value>
+			<Value>Species_Absence_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -345,6 +360,9 @@ used by the MapBasic tool to select and export data for partners.
 		<WhereClause>
 			<Value>NEG_RECORD = 'Y' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</WhereClause>
+		<OrderClause>
+			<Value></Value>
+		</OrderClause>
 		<Symbology>
 			<Symbol>
 				<Clause>
@@ -369,10 +387,10 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_SppAbsence>
-	<GiGL_CoarseResolutionSpp>
+	</SppAbsence>
+	<CoarseResolutionSpp>
 		<OutputName>
-			<Value>GiGL_Species_Coarse_%partner%</Value>
+			<Value>Species_Coarse_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -380,6 +398,9 @@ used by the MapBasic tool to select and export data for partners.
 		<WhereClause>
 			<Value>GRPRECISION &gt;100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</WhereClause>
+		<OrderClause>
+			<Value></Value>
+		</OrderClause>
 		<Symbology>
 			<Symbol>
 				<Clause>
@@ -424,10 +445,10 @@ used by the MapBasic tool to select and export data for partners.
 				</Brush>
 			</Symbol>
 		</Symbology>
-	</GiGL_CoarseResolutionSpp>
-	<GiGL_Plants>
+	</CoarseResolutionSpp>
+	<Plants>
 		<OutputName>
-			<Value>GiGL_Species_Plants_%partner%</Value>
+			<Value>Species_Plants_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -435,6 +456,9 @@ used by the MapBasic tool to select and export data for partners.
 		<WhereClause>
 			<Value>TAXONOMIC_GROUP = 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</WhereClause>
+		<OrderClause>
+			<Value></Value>
+		</OrderClause>
 		<Symbology>
 			<Symbol>
 				<Clause>
@@ -459,10 +483,10 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_Plants>
-	<GiGL_OtherSpp>
+	</Plants>
+	<OtherSpp>
 		<OutputName>
-			<Value>GiGL_Species_Other_%partner%</Value>
+			<Value>Species_Other_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -470,6 +494,9 @@ used by the MapBasic tool to select and export data for partners.
 		<WhereClause>
 			<Value>TAXONOMIC_GROUP &lt;&gt; 'bird' AND TAXONOMIC_GROUP &lt;&gt; 'flowering plant' AND GRPRECISION &lt;= 100 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</WhereClause>
+		<OrderClause>
+			<Value></Value>
+		</OrderClause>
 		<Symbology>
 			<Symbol>
 				<Clause>
@@ -495,9 +522,9 @@ used by the MapBasic tool to select and export data for partners.
 			</Symbol>
 		</Symbology>
 	</GiGL_OtherSpp>
-	<GiGL_HistoricSpp>
+	<HistoricSpp>
 		<OutputName>
-			<Value>GiGL_Species_Historic_%partner%</Value>
+			<Value>Species_Historic_%partner%</Value>
 		</OutputName>
 		<Columns>
 			<Value>SPP_NAME, LATIN_NAME, RECORD_TAXON_CLASS, TAXONOMIC_GROUP, DATE_START, DATE_END, DATE_RANGE, RECORDYEAR, RECORDER, DETERMINER, VERIFICATION, GRIDREF, EASTINGS, NORTHINGS, GRPRECISION, QUALIFIER, COMMENTS, BREEDING_STATUS, STATUS_PLANNING, STATUS_OTHER, STATUS_LISI, CONFIDENTIAL, SENSITIVE, SORTORDER, R6SURVEY, RECORDERID_TOCC, SP_GEOMETRY</Value>
@@ -505,6 +532,9 @@ used by the MapBasic tool to select and export data for partners.
 		<WhereClause>
 			<Value>RECORDYEAR &lt; 1985 AND GRIDREF IS NOT NULL AND DATE_START IS NOT NULL AND RECORDER IS NOT NULL AND LATIN_NAME &lt;&gt; 'Homo sapiens' AND VERIFICATION &lt;&gt; 'Considered incorrect'</Value>
 		</WhereClause>
+		<OrderClause>
+			<Value></Value>
+		</OrderClause>
 		<Symbology>
 			<Symbol>
 				<Clause>
@@ -529,17 +559,17 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_HistoricSpp>
+	</HistoricSpp>
   </SQLTables>
 
   <!-- The names and local names of the map tables and the required columns for the map tables -->
   <MapTables>
 	<Habitat>
 		<TableName>
-			<Value>GiGL_Habitat</Value>
+			<Value>Habitat</Value>
 		</TableName>
 		<OutputName>
-			<Value>GiGL_Habitat_%partner%</Value>
+			<Value>Habitat_%partner%</Value>
 		</OutputName>
 	  	<Columns>
 			<Value>HabitatShortName, HabitatLongName, HabitatClassification, ClassificationVersion, NBN_biotope, SiteName, SiteNameOther, SiteRef, Borough, NBN_Loc, PolygonID, GISlinkID, OriginalPolygonRef, AreaHa, CentroidX, CentroidY, SurveyDate, Surveyor, DataCreatedDate, DataCreatedUser, DataCreatedComment, LastModifiedDate, LastModifiedUser, LastModifiedComment, BaseMap, Digitisation, FurtherInfo</Value>
@@ -550,10 +580,10 @@ used by the MapBasic tool to select and export data for partners.
 	</Habitat>
 	<BAP_CA_S>
 		<TableName>
-			<Value>GiGL_BAP_Condition</Value>
+			<Value>BAP_Condition</Value>
 		</TableName>
 		<OutputName>
-			<Value>GiGL_BAP_Condition_%partner%</Value>
+			<Value>BAP_Condition_%partner%</Value>
 		</OutputName>
 	  	<Columns>
 			<Value>ConditionShort, ConditionLong, SuitabilityShort, SuitabilityLong, OriginalHabShort, OriginalHabLong, SiteName, SiteNameOther, SiteRef, Borough, PolygonID, GISlinkID, OriginalPolygonRef, PolygonAreaHa, CentroidX, CentroidY, DataCreatedDate, DataCreatedUser, DataCreatedComment, BaseMap, Digitisation, FurtherInfo</Value>
