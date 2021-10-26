@@ -285,6 +285,9 @@ Declare Function CreateDirectory Lib "kernel32"
 	Alias "CreateDirectoryA"
 	(ByVal sPathName as String,
 	iSecurityAttributes as Integer) As Integer
+Declare Function RemoveDirectory Lib "kernel32"
+	Alias "RemoveDirectoryA"
+	(ByVal sPathName as String) As Integer
 Declare Function SetCurrentDirectory Lib "kernel32"
 	Alias "SetCurrentDirectoryA"
 	(lpBuffer As String) As Integer
@@ -511,5 +514,7 @@ Global sDateFFFF As String
 
 Global sLastPartnerName As String
 Global sLastSQLTable As String
+Global sLastFormat As String
+Global sLastMapInfoPath As String
 
 Global iErrorCount as Integer

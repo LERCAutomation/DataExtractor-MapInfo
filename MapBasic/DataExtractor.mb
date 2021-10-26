@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.7.03
+'* DataExtractor v1.7.04
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -29,6 +29,12 @@
 '*
 '* Created:         Andy Foy - November 2012
 '* Last revised:    Andy Foy - October 2021
+'*
+'* *****************  Version 1.7.04  ***************
+'* Author: Andy Foy		Date: 01/10/2021
+'* A. Fix bug saving all outputs to first partner folder.
+'* B. Fix bug when exporting SQL file with no where
+'*    clause.
 '*
 '* *****************  Version 1.7.03  ***************
 '* Author: Andy Foy		Date: 01/10/2021
@@ -332,7 +338,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.7.03"
+	sVersion = "1.7.04"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -1515,6 +1521,8 @@ Sub CheckSelection
 	iMapTotal = 0
 	sLastPartnerName = ""
 	sLastSQLTable = ""
+	sLastFormat = ""
+	sLastMapInfoPath = ""
 
 	'-------------------------------------------------
 	' Set the date variables
@@ -1894,21 +1902,24 @@ Sub ProcessExtracts
 	'-------------------------------------------------
 	' Set the main output sub-folder
 	'-------------------------------------------------
+	Dim sOutputFolder As String
 	If sPartnerFolder = "" Then
-		sPartnerFolder = sShortName
+		sOutputFolder = sShortName
+	Else
+		sOutputFolder = sPartnerFolder
 	End If
 
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
-	sPartnerFolder = StringReplace(sPartnerFolder, "%partner%", sShortName)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%dd%", sDateDD)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%mm%", sDateMM)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%mmm%", sDateMMM)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%yy%", sDateYY)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%qq%", sDateQQ)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%yyyy%", sDateYYYY)
-	sPartnerFolder = StringReplace(sPartnerFolder, "%ffff%", sDateFFFF)
+	sOutputFolder = StringReplace(sOutputFolder, "%partner%", sShortName)
+	sOutputFolder = StringReplace(sOutputFolder, "%dd%", sDateDD)
+	sOutputFolder = StringReplace(sOutputFolder, "%mm%", sDateMM)
+	sOutputFolder = StringReplace(sOutputFolder, "%mmm%", sDateMMM)
+	sOutputFolder = StringReplace(sOutputFolder, "%yy%", sDateYY)
+	sOutputFolder = StringReplace(sOutputFolder, "%qq%", sDateQQ)
+	sOutputFolder = StringReplace(sOutputFolder, "%yyyy%", sDateYYYY)
+	sOutputFolder = StringReplace(sOutputFolder, "%ffff%", sDateFFFF)
 
 	'-------------------------------------------------
 	' If this is a new partner or a different SQL table ...
@@ -1931,7 +1942,8 @@ Sub ProcessExtracts
 			If nConn = 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Unable to connect to SQL Server!")
-				Exit Sub
+				sLastSQLTable = ""
+				Goto CleanUp
 			End If 
 		
 			'-------------------------------------------------
@@ -1952,6 +1964,22 @@ Sub ProcessExtracts
 	
 		End If
 	
+		'-------------------------------------------------
+		' Delete the MapInfo output folder if it is empty
+		'-------------------------------------------------
+		If (UCase$(sLastFormat) <> "TAB" And UCase$(sLastFormat) <> "BOTH") And sLastFormat <> "" Then
+			If bDebug Then
+				Call MyPrint("Last Format = '" + sLastFormat + "'.")
+				Call MyPrint("Removing empty output path '" + sLastMapInfoPath + "'.")
+			End If
+			Dim iSuccess As Integer
+			iSuccess = RemoveDirectory(sLastMapInfoPath)
+			if iSuccess <> 1 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Removing empty output path")
+			End If
+		End If
+		
 		If iExtractCnt <> 1 Then
 
 			'-------------------------------------------------
@@ -1959,7 +1987,7 @@ Sub ProcessExtracts
 			' partner if required
 			'-------------------------------------------------
 			If bZipFiles Then
-				If ZipFiles(sDefaultPath, sPartnerFolder) > 1 Then
+				If ZipFiles(sDefaultPath, sOutputFolder) > 1 Then
 					iErrorCount = iErrorCount + 1
 					Call MyPrint("Error: Zipping extract files for partner.")
 				End If
@@ -1974,19 +2002,16 @@ Sub ProcessExtracts
 		Call MyPrint("----------------------------------------------------------------------")
 		Call MyPrint("Processing partner '" + sPartnerName + " (" + sShortName + ")' ...")
 
-		' Save the last partner name
-		sLastPartnerName = sPartnerName
-
 		'-------------------------------------------------
 		' Set the local path
 		'-------------------------------------------------
-		sLocalPath = sDefaultPath + "\" + sPartnerFolder
+		sLocalPath = sDefaultPath + "\" + sOutputFolder
 	
 		'-------------------------------------------------
 		' Create the partner directory path if it doesn't
 		' already exist
 		'-------------------------------------------------
-		Dim iSuccess, iSecurity As Integer
+		Dim iSecurity As Integer
 		iSecurity = 0
 
 		iSuccess = SetCurrentDirectory(sLocalPath)
@@ -1998,8 +2023,7 @@ Sub ProcessExtracts
 			if iSuccess <> 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
+				Goto CleanUp
 			End If
 		End If
 
@@ -2039,11 +2063,15 @@ Sub ProcessExtracts
 			if iSuccess <> 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
+				Goto CleanUp
 			End If
 		End If
 	
+		' Save the last partner details
+		sLastPartnerName = sPartnerName
+		sLastFormat = sFormat
+		sLastMapInfoPath = sMapInfoPath
+
 		'-------------------------------------------------
 		' Check the partner requires some SQL files
 		'-------------------------------------------------
@@ -2091,7 +2119,8 @@ Sub ProcessExtracts
 			If nConn = 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Unable to connect to SQL Server!")
-				Exit Sub
+				sLastSQLTable = ""
+				Goto CleanUp
 			End If
 
 			nStmt1 = Server_Execute(nConn, "EXECUTE " + sDefaultSchema + ".AFSelectSppRecords '" + sDefaultSchema
@@ -2170,11 +2199,26 @@ Sub ProcessExtracts
 	If iExtractCnt = iExtractTot Then
 
 		'-------------------------------------------------
+		' Delete the MapInfo output folder if it is empty
+		'-------------------------------------------------
+		If (UCase$(sFormat) <> "TAB" And UCase$(sFormat) <> "BOTH") Then
+			If bDebug Then
+				Call MyPrint("Format = '" + sFormat + "'.")
+				Call MyPrint("Removing empty output path '" + sMapInfoPath + "'.")
+			End If
+			iSuccess = RemoveDirectory(sMapInfoPath)
+			if iSuccess <> 1 Then
+				iErrorCount = iErrorCount + 1
+				Call MyPrint("Error: Removing empty output path")
+			End If
+		End If
+		
+		'-------------------------------------------------
 		' Zip up all the extract files for the last
 		' partner if required
 		'-------------------------------------------------
 		If bZipFiles Then
-			If ZipFiles(sDefaultPath, sPartnerFolder) > 1 Then
+			If ZipFiles(sDefaultPath, sOutputFolder) > 1 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Zipping extract files for partner.")
 			End If
@@ -2239,7 +2283,9 @@ CleanUp:
 		'-------------------------------------------------
 		' Halt processing
 		'-------------------------------------------------
+		iExtractCnt = iExtractTot + 1
 		ProgressBar = -1
+	
 	End If
 
 ExitSub:
@@ -2515,7 +2561,11 @@ Sub SelectSQL (sPartnerName As String,
 	' temporary table (to check the record length)
 	'-------------------------------------------------
 	Dim sSQLStmt As String
-	sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause + " AND (1 = 0)"
+	If sSQLWhereClause = "" Then
+		sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " WHERE (1 = 0)"
+	Else
+		sSQLStmt = "Select " + sSQLColumns + " From " + sDefaultSchema + "." + sSQLTable + " " + sSQLWhereClause + " AND (1 = 0)"
+	End If
 
 	'-------------------------------------------------
 	' Link the SQL table as a temporary table
