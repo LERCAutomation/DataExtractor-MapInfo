@@ -2530,7 +2530,7 @@ Sub SelectSQL (sPartnerName As String,
 	' exceeded
 	'-------------------------------------------------
 	If iRecTotal > iRecMax Then
-		Call MyPrint("Record count exceeds maximum of " + FormatNumber$(iRecMax) + " - extract skipped.")
+		Call MyPrint("Error: Record count exceeds maximum of " + FormatNumber$(iRecMax) + " - extract skipped.")
 		Goto NextClause
 	End If
 

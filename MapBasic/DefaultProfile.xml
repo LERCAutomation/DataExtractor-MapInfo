@@ -48,6 +48,26 @@ used by the MapBasic tool to select and export data for partners.
 	<value>%partner%_DataExchange_%qq%_%ffff%</value>
   </PartnerFolder>
 
+  <!-- The output sub-folder into which MapInfo files will be saved -->
+  <MapInfoFolder>
+	<value>MapInfo</value>
+  </MapInfoFolder>
+
+  <!-- The output sub-folder into which ArcGIS files will be saved -->
+  <ArcGISFolder>
+	<value>ArcGIS</value>
+  </ArcGISFolder>
+
+  <!-- The output sub-folder into which CSV files will be saved -->
+  <CSVFolder>
+	<value>CSV</value>
+  </CSVFolder>
+
+  <!-- The output sub-folder into which TXT files will be saved -->
+  <TXTFolder>
+	<value></value>
+  </TXTFolder>
+
   <!-- The schema used in the SQL Server database -->
   <DatabaseSchema>
 	<value>dbo</value>
