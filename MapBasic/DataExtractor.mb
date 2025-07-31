@@ -628,8 +628,8 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					'-------------------------------------------------
 					Dim i As Integer
 					i = 0
-					Redim SQLFiles(99)
-					Redim SQLFilesList(99)
+					Redim SQLFiles(199)
+					Redim SQLFilesList(199)
 					Do while hXMLFilesNode
 						
 						i = i + 1
@@ -696,7 +696,7 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 					' storing the table names and columns and in arrays
 					'-------------------------------------------------
 					i = 0
-					Redim AllMaps(99)
+					Redim AllMaps(199)
 					Do while hXMLFilesNode
 						
 						i = i + 1
@@ -1226,7 +1226,7 @@ GetSQLTables:
 	' SQL criteria and add them to the SQL Tables list
 	'-------------------------------------------------
 	i = 0
-	Redim SQLTablesList(99)
+	Redim SQLTablesList(199)
 	While Not Server_Eot(nStmt)
 
 		'-------------------------------------------------
@@ -1274,8 +1274,8 @@ GetMapFiles:
 	'-------------------------------------------------
 	Dim j As Integer
 	j = 0
-	Redim OpenMaps(99)
-	Redim OpenMapsList(99)
+	Redim OpenMaps(199)
+	Redim OpenMapsList(199)
 	For i = 1 to UBound(AllMaps)
 
 		'-------------------------------------------------

@@ -479,13 +479,13 @@ Global sPrecisionCol As String
 Global Partners(999) As PartnerDetails
 Global PartnersList(999) As String
 
-Global SQLTablesList(99) As String
-Global SQLFilesList(99) As String
-Global OpenMapsList(99) As String
+Global SQLTablesList(199) As String
+Global SQLFilesList(199) As String
+Global OpenMapsList(199) As String
 
-Global SQLFiles(99) As SQLDetails
-Global AllMaps(99) As MapDetails
-Global OpenMaps(99) As MapDetails
+Global SQLFiles(199) As SQLDetails
+Global AllMaps(199) As MapDetails
+Global OpenMaps(199) As MapDetails
 
 Global ProcessSelected(25000) As ProcessDetails
 
