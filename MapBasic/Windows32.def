@@ -1,7 +1,7 @@
 '* DataExtractor is a MapInfo tool to extract biodiversity information
 '* from SQL Server and MapInfo GIS layer for pre-defined spatial areas.
 '*
-'* Copyright © 2012 - 2019 GiGL, TVERC, SBIC
+'* Copyright © 2012 - 2026 TVERC, GiGL, SBIC, DERC, Andy Foy Consulting
 '* 
 '* This file is part of the MapInfo tool 'DataExtractor'.
 '* 
@@ -19,14 +19,14 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* Windows32.def v1.01
+'* Windows32.def v1.02
 '*
 '* Defines XML and menu global variables and declares subroutines
 '* and functions.
 '*
 '*
-'* Created:			Andy Foy - July 2019
-'* Last revised:	Andy Foy - July 2019
+'* Created:		Andy Foy - July 2019
+'* Last revised:	Andy Foy - October 2026
 '***************************************************************
 
 '-------------------------------------------------
