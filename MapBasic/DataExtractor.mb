@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.7.04
+'* DataExtractor v1.7.05
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -28,7 +28,17 @@
 '*
 '*
 '* Created:         Andy Foy - November 2012
-'* Last revised:    Andy Foy - October 2021
+'* Last revised:    Andy Foy - October 2026
+'*
+'* *****************  Version 1.7.05  ***************
+'* A. Stage outputs in optional WorkingDir and move them
+'*    to the destination after each partner.
+'* B. Zip the correct partner folder and close non-spatial
+'*    SQL TAB outputs before completing each partner.
+'* C. Buffer run logs locally and publish diagnostics at completion.
+'* D. Consolidate directory creation and verify ZIP contents.
+'* E. Scope MapInfo boundary checks to the selected partner.
+'* F. Validate output-name collisions before extracting or uploading.
 '*
 '* *****************  Version 1.7.04  ***************
 '* Author: Andy Foy		Date: 01/10/2021
@@ -338,7 +348,7 @@ Sub Main
 	'-------------------------------------------------
 	' Set the version number
 	'-------------------------------------------------
-	sVersion = "1.7.04"
+	sVersion = "1.7.05"
 
 	'-------------------------------------------------
 	' Get the title for the Tool menu
@@ -504,6 +514,9 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 
 					' Default file path to store extracts in sub-folders
 					sDefaultPath = GetSingleNodeValue(hXMLNode, "DefaultPath")
+
+					' Optional local folder for staging output files
+					sWorkingDir = LTrim$(RTrim$(GetSingleNodeValue(hXMLNode, "WorkingDir")))
 
 					' The output sub-folder in which each partner files will be created
 					sPartnerFolder = GetSingleNodeValue(hXMLNode, "PartnerFolder")
@@ -763,15 +776,11 @@ Sub GetDefaultValues(ByVal sXMLFile As String)
 	Dim iSuccess, iSecurity As Integer
 	iSecurity = 0
 
-	iSuccess = SetCurrentDirectory(sLogFilePath)
-	if iSuccess = 0 Then
-		iSuccess = SHCreateDirectoryEx(0, sLogFilePath, iSecurity)
-		if iSuccess <> 0 Then
-			Call MyPrint("Error creating log file path")
-			Call MyPrint("Process terminated.")
-			sXMLFile = ""
-			Goto CleanUp
-		End If
+	If Not CreatePath(sLogFilePath) Then
+		Call MyPrint("Error creating log file path")
+		Call MyPrint("Process terminated.")
+		sXMLFile = ""
+		Goto CleanUp
 	End If
 
 	'-------------------------------------------------
@@ -1481,6 +1490,7 @@ Sub CheckSelection
 '***************************************************************
 '* Check the user's selections and process according
 '***************************************************************
+    OnError Goto RunError
 
 	'-------------------------------------------------
 	' Store the dialog variables
@@ -1515,6 +1525,18 @@ Sub CheckSelection
 	'-------------------------------------------------
 	' Reset the global variables
 	'-------------------------------------------------
+
+    If bLogBuffered And iLogCount > 0 Then
+        Call CommitLogMessages
+        If iLogCount > 0 Then Exit Sub End If
+    End If
+    ReDim sLogMessages(100)
+    iLogCount = 0
+    iMacroLogLines = 0
+    bLogBuffered = True
+    bLogWarning = False
+    sLogFileTmp = ""
+    sSupportPath = ""
 	iExtractTot = 0
 	iExtractCnt = 0
 	iSQLTotal = 0
@@ -1523,6 +1545,14 @@ Sub CheckSelection
 	sLastSQLTable = ""
 	sLastFormat = ""
 	sLastMapInfoPath = ""
+	sWorkingRoot = ""
+    sZipTar = ""
+    sZipCompare = ""
+	sOutputRoot = ""
+	sPartnerOutputFolder = ""
+	sPartnerFinalPath = ""
+	bPartnerPending = False
+	bProcessingStopped = False
 
 	'-------------------------------------------------
 	' Set the date variables
@@ -1653,6 +1683,30 @@ Sub CheckSelection
 		iMapTable = ReadControlValue(3)
 	Loop
 
+    iErrorCount = 0
+    If Not PrepareWorkingDirectory() Then
+        Call CommitLogMessages
+        Note "Unable to prepare the output folders. Please check the log for details."
+        Exit Sub
+    End If
+    sLogFilePath = FullPath(sLogFilePath)
+    sLogFileName = sLogFilePath + "\DataExtractor_" + sUserID + ".log"
+    sSupportPath = sLogFilePath
+    If sWorkingRoot <> "" Then sSupportPath = sWorkingRoot End If
+    If Not CreatePath(sSupportPath) Then
+        Call MyPrint("Unable to create the run log folder.")
+        Call CommitLogMessages
+        Exit Sub
+    End If
+    Dim sLogToken As String, iBuffered As Integer, bReplayWritten As Logical
+    sLogToken = sDateYYYY + sDateMM + sDateDD + "_" + StringReplace(FormatTime$(CurTime(), "HH:mm:ss"), ":", "") + "_" + LTrim$(Str$(Int(Rnd(1) * 1000000)))
+    sLogFileTmpName = "DataExtractor_" + sUserID + "_tmp_" + sLogToken + ".log"
+    sLogFileTmp = sSupportPath + "\" + sLogFileTmpName
+    sMacroLogFile = sSupportPath + "\ExportMacro_" + sUserID + "_" + sLogToken + ".log"
+    For iBuffered = 1 To iLogCount
+        bReplayWritten = WriteLogLine(sLogFileTmp, sLogMessages(iBuffered))
+    Next
+
 	'-------------------------------------------------
 	' Archive the log file (if it exists)
 	'-------------------------------------------------
@@ -1679,8 +1733,8 @@ Sub CheckSelection
 		Dim sLogFileShp As String
 		sLogFileShp = "TabToShp_" + sUserID
 
-		If FileExists(sLogFilePath + "\" + sLogFileShp + "_MUT.log") Then
-			Kill sLogFilePath + "\" + sLogFileShp + "_MUT.log"
+		If FileExists(sSupportPath + "\" + sLogFileShp + "_MUT.log") Then
+			Kill sSupportPath + "\" + sLogFileShp + "_MUT.log"
 		End If
 
 		'-------------------------------------------------
@@ -1690,8 +1744,8 @@ Sub CheckSelection
 		Dim sLogFileEasy As String
 		sLogFileEasy = "EasyLoader_" + sUserID
 
-		If FileExists(sLogFilePath + "\" + sLogFileEasy + ".log") Then
-			Kill sLogFilePath + "\" + sLogFileEasy + ".log"
+		If FileExists(sSupportPath + "\" + sLogFileEasy + ".log") Then
+			Kill sSupportPath + "\" + sLogFileEasy + ".log"
 		End If
 	End If
 
@@ -1719,9 +1773,24 @@ Sub CheckSelection
 	Call MyPrint("")
 
 	'-------------------------------------------------
-	' Reset the error counter
+	' Continue with the error count for this run
 	'-------------------------------------------------
-	iErrorCount = 0
+
+    If Not ValidateOutputNames() Then
+        Call FinishRunLog
+        Call PrintLogFile
+        Note "Output names conflict or are invalid. Please check the log; no extracts have been started."
+        Exit Sub
+    End If
+
+    If bZipFiles Then
+        If Not InitZipTools() Then
+            Call MyPrint("Process stopped: ZIP tools are unavailable.")
+            Call FinishRunLog
+            Call PrintLogFile
+            Exit Sub
+        End If
+    End If
 
 	'-------------------------------------------------
 	' Upload the partner table to the server if
@@ -1732,7 +1801,7 @@ Sub CheckSelection
 		sLogFileSql = "EasyLoader" + "_" + sUserID
 
 		Dim sUploadLogFile As String
-		sUploadLogFile = sLogFilePath + "\" + sLogFileSql + ".log"
+		sUploadLogFile = sSupportPath + "\" + sLogFileSql + ".log"
 		
 		Dim sPartnerTabFile As String
 		sPartnerTabFile = TableInfo(sPartnerTable, TAB_INFO_TABFILE)
@@ -1759,7 +1828,19 @@ Sub CheckSelection
 	' Ask the user if they want to close the form
 	'-------------------------------------------------
 	Dim lResponse As Logical
-	If CommandInfo(CMD_INFO_STATUS) Then
+	Dim bCompleted As Logical
+	bCompleted = CommandInfo(CMD_INFO_STATUS)
+
+    If sWorkingRoot <> "" And bPartnerPending Then
+        Call MyPrint("Unfinished partner outputs retained in '" + sLocalPath + "'.")
+    End If
+
+	If bProcessingStopped Then
+		Call MyPrint("----------------------------------------------------------------------")
+		Call MyPrint("Process stopped because of an error. Check the log for details.")
+		Call MyPrint("----------------------------------------------------------------------")
+		lResponse = Ask("Processing stopped because of an error." + Chr$(10) + "Please check the log for details." + Chr$(10) + Chr$(10) + "Do you wish to close the form?", "Yes", "No")
+	ElseIf bCompleted Then
 		Call MyPrint("----------------------------------------------------------------------")
 		Call MyPrint("Process completed!")
 		Call MyPrint("----------------------------------------------------------------------")
@@ -1782,6 +1863,7 @@ Sub CheckSelection
 	'-------------------------------------------------
 	' Report the number of errors
 	'-------------------------------------------------
+    Call FinishRunLog
 	If iErrorCount > 0 then
 		Note "There were errors during this process. Please check the log for details."
 	End If
@@ -1790,6 +1872,13 @@ Sub CheckSelection
 	' Display the log file in the message window
 	'-------------------------------------------------
 	Call PrintLogFile
+
+    Exit Sub
+RunError:
+    iErrorCount = iErrorCount + 1
+    Call MyPrint("Run stopped: " + Str$(Err()) + " - " + Error$())
+    Call FinishRunLog
+    Call PrintLogFile
 
 End Sub
 
@@ -1831,7 +1920,7 @@ Function UploadtoServer(sEasyLoaderCommand As String,
 	'-------------------------------------------------
 	Call MyPrint("Uploading partner table to server ...")
 	
-	If ExecuteAndWait(sUploadCmd) > 0 then
+	If ExecuteAndWait(sUploadCmd) <> 0 then
 		UploadToServer = 1
 		Exit Sub
 	End if
@@ -1840,6 +1929,258 @@ Function UploadtoServer(sEasyLoaderCommand As String,
 	Call MyPrint("")
 	UploadToServer = 0
 	
+End Function
+
+Function FullPath(ByVal sPath As String) As String
+'*************************************************
+'* Resolve relative paths before changing directory.
+'*************************************************
+
+	Dim sBuffer As String, iLength As Integer
+	FullPath = ""
+	If sPath = "" Then Exit Function End If
+	sBuffer = Space$(1024)
+	iLength = GetFullPathName(sPath, 1024, sBuffer, 0)
+	If iLength = 0 Or iLength >= 1024 Then Exit Function End If
+	sPath = Left$(sBuffer, iLength)
+	Do While Len(sPath) > 3 And Right$(sPath, 1) = "\"
+		sPath = Left$(sPath, Len(sPath) - 1)
+	Loop
+	FullPath = sPath
+
+End Function
+
+Function PathIsWithin(ByVal sPath As String, ByVal sRoot As String) As Logical
+'*************************************************
+'* Require a child path, excluding the root itself.
+'*************************************************
+
+	PathIsWithin = False
+	If sPath = "" Or sRoot = "" Then Exit Function End If
+	If Right$(sRoot, 1) <> "\" Then sRoot = sRoot + "\" End If
+	PathIsWithin = Left$(UCase$(sPath), Len(sRoot)) = UCase$(sRoot)
+
+End Function
+
+Function ExpandOutputVariables(ByVal sValue As String, ByVal sShortName As String) As String
+'*************************************************
+'* Expand names consistently for preflight and export.
+'*************************************************
+    sValue = StringReplace(sValue, "%partner%", sShortName)
+    sValue = StringReplace(sValue, "%dd%", sDateDD)
+    sValue = StringReplace(sValue, "%mm%", sDateMM)
+    sValue = StringReplace(sValue, "%mmm%", sDateMMM)
+    sValue = StringReplace(sValue, "%yy%", sDateYY)
+    sValue = StringReplace(sValue, "%yyyy%", sDateYYYY)
+    sValue = StringReplace(sValue, "%qq%", sDateQQ)
+    sValue = StringReplace(sValue, "%ffff%", sDateFFFF)
+    ExpandOutputVariables = sValue
+End Function
+
+Function ValidateOutputNames() As Logical
+    '*************************************************
+    '* Reject conflicting destinations before any partner
+    '* is processed. Include intermediate TAB files, which
+    '* otherwise can replace a retained table from another
+    '* output even when their final formats differ.
+    '*************************************************
+    OnError Goto Failed
+    ValidateOutputNames = False
+    Dim sPaths() As String, iOwners() As Integer
+    Dim i As Integer, j As Integer, iKind As Integer, iCount As Integer
+    Dim iGap As Integer, iOwner As Integer
+    Dim sFiles As String, sNode As String, sName As String, sFolder As String
+    Dim sFormat As String, sExport As String, sType As String, sPath As String
+    Dim sSubfolder As String, sExtension As String, sKey As String
+    ReDim sPaths(iExtractTot)
+    ReDim iOwners(iExtractTot)
+    ' Check each extension separately to stay within MapBasic array limits.
+    For iKind = 1 To 4
+        iCount = 0
+        For i = 1 To iExtractTot
+            sFiles = UCase$(ProcessSelected(i).Files)
+            sNode = ProcessSelected(i).Node
+            If sFiles = "" Or ProcessSelected(i).TableName = "" Then Goto NextOutput End If
+            If sFiles <> "ALL" And Instr(1, sFiles, UCase$(sNode)) = 0 Then Goto NextOutput End If
+            If ProcessSelected(i).Formats = "" And ProcessSelected(i).Exports = "" And ProcessSelected(i).OutputType = "" Then Goto NextOutput End If
+
+            sName = Left$(ExpandOutputVariables(ProcessSelected(i).OutputName, ProcessSelected(i).Short), 31)
+            If sName = "" Then
+                Call MyPrint("Error: Output name is blank for '" + sNode + "', partner '" + ProcessSelected(i).Partner + "'.")
+                Goto Failed
+            End If
+            sFolder = sPartnerFolder
+            If sFolder = "" Then sFolder = ProcessSelected(i).Short End If
+            sFolder = FullPath(sDefaultPath + "\" + ExpandOutputVariables(sFolder, ProcessSelected(i).Short))
+            If Not PathIsWithin(sFolder, sDefaultPath) Then
+                Call MyPrint("Error: Partner folder must be a sub-folder of the output root.")
+                Goto Failed
+            End If
+            sFormat = UCase$(ProcessSelected(i).Formats)
+            sExport = UCase$(ProcessSelected(i).Exports)
+            sType = UCase$(ProcessSelected(i).OutputType)
+            If sType <> "" Then
+                sFormat = ""
+                If sType = "TAB" Or sType = "SHP" Or sType = "BOTH" Then sFormat = sType End If
+                If ProcessSelected(i).TableType = "Map" And (sType = "CSV" Or sType = "TXT") Then sExport = sType End If
+            End If
+            sExtension = ""
+            If iKind = 1 Then
+                sSubfolder = sMapInfoFolder
+                sExtension = ".tab"
+            ElseIf iKind = 2 Then
+                sSubfolder = sArcGISFolder
+                If sFormat = "SHP" Or sFormat = "BOTH" Then sExtension = ".shp" End If
+            ElseIf iKind = 3 Then
+                sSubfolder = sCSVFolder
+                If sExport = "CSV" Then sExtension = ".csv" End If
+            Else
+                sSubfolder = sTXTFolder
+                If sExport = "TXT" Then sExtension = ".txt" End If
+            End If
+            If sExtension <> "" Then
+                sPath = sFolder
+                If sSubfolder <> "" Then sPath = sPath + "\" + sSubfolder End If
+                sPath = FullPath(sPath + "\" + sName + sExtension)
+                If sPath = "" Then Goto Failed End If
+                iCount = iCount + 1
+                sPaths(iCount) = UCase$(sPath)
+                iOwners(iCount) = i
+            End If
+NextOutput:
+        Next
+
+        ' Shell sort keeps validation practical for large multi-partner runs.
+        iGap = Int(iCount / 2)
+        Do While iGap > 0
+            For i = iGap + 1 To iCount
+                sKey = sPaths(i)
+                iOwner = iOwners(i)
+                j = i
+                Do While j > iGap
+                    If sPaths(j - iGap) <= sKey Then Exit Do End If
+                    sPaths(j) = sPaths(j - iGap)
+                    iOwners(j) = iOwners(j - iGap)
+                    j = j - iGap
+                Loop
+                sPaths(j) = sKey
+                iOwners(j) = iOwner
+            Next
+            iGap = Int(iGap / 2)
+        Loop
+        For i = 2 To iCount
+            If sPaths(i) = sPaths(i - 1) Then
+                Call MyPrint("Error: Requested outputs would overwrite the same file: '" + sPaths(i) + "'.")
+                Call MyPrint("Conflicting definitions: '" + ProcessSelected(iOwners(i - 1)).Node + "' for partner '" + ProcessSelected(iOwners(i - 1)).Partner + "' and '" + ProcessSelected(iOwners(i)).Node + "' for partner '" + ProcessSelected(iOwners(i)).Partner + "'.")
+                Call MyPrint("Check expanded output names, the 31-character limit and output folders. No extracts have been started.")
+                Goto Failed
+            End If
+        Next
+    Next
+    ValidateOutputNames = True
+    Exit Function
+Failed:
+    iErrorCount = iErrorCount + 1
+    Call MyPrint("Output-name validation failed. Process stopped before extraction or partner upload.")
+End Function
+
+Function PrepareWorkingDirectory() As Logical
+    OnError Goto ErrorTrap
+    PrepareWorkingDirectory = False
+    sDefaultPath = FullPath(sDefaultPath)
+    If sDefaultPath = "" Then Goto ErrorTrap End If
+    sOutputRoot = sDefaultPath
+    If sWorkingDir <> "" Then
+        sWorkingRoot = NewWorkingFolder(sWorkingDir, "DataExtractor")
+        If sWorkingRoot = "" Then Goto ErrorTrap End If
+        sOutputRoot = sWorkingRoot
+        Call MyPrint("Working folder = '" + sWorkingRoot + "'.")
+        Call MyPrint("Final output folder = '" + sDefaultPath + "'.")
+    End If
+    PrepareWorkingDirectory = True
+    Exit Function
+ErrorTrap:
+    iErrorCount = iErrorCount + 1
+    Call MyPrint("Error: Unable to prepare output folders. WorkingDir = '" + sWorkingDir + "'; DefaultPath = '" + sDefaultPath + "'.")
+End Function
+
+Function CompletePartner() As Logical
+'*************************************************
+'* Complete the active partner using its stored paths.
+'* Called at partner transitions and after the final
+'* extract, including an extract that was skipped.
+'*************************************************
+
+	OnError Goto ErrorTrap
+	Dim iResult As Integer, iTable As Integer
+	Dim sTableFile As String, sTableName As String, sCmd As String, sQ As String
+	CompletePartner = False
+	If Not bPartnerPending Then
+		CompletePartner = True
+		Exit Function
+	End If
+
+	' Close only tables saved in this partner's output folder.
+	For iTable = NumTables() To 1 Step -1
+		sTableFile = FullPath(TableInfo(iTable, TAB_INFO_TABFILE))
+		If PathIsWithin(sTableFile, sLocalPath) Then
+			sTableName = TableInfo(iTable, TAB_INFO_NAME)
+			Commit Table sTableName
+			Close Table sTableName
+		End If
+	Next
+
+	' Release the partner directory before removing or moving it.
+	iResult = SetCurrentDirectory(sOutputRoot)
+	If iResult = 0 Then Goto ErrorTrap End If
+
+	' A format override or shared output folder may leave this non-empty.
+	' RemoveDirectory only removes empty folders; retain all other outputs.
+	If UCase$(sLastFormat) <> "TAB" And UCase$(sLastFormat) <> "BOTH" And sLastMapInfoPath <> sLocalPath Then
+		iResult = RemoveDirectory(sLastMapInfoPath)
+	End If
+
+	If bZipFiles Then
+		iResult = ZipFiles(sOutputRoot, sPartnerOutputFolder)
+		If iResult < 0 Or iResult > 1 Then
+			Call MyPrint("Error: Zipping extract files for partner '" + sLastPartnerName + "'.")
+			Goto ErrorTrap
+		End If
+	End If
+
+	If sWorkingRoot <> "" Then
+		' Never move a root folder or overlapping source/destination trees.
+		If Not PathIsWithin(sLocalPath, sWorkingRoot) Or Not PathIsWithin(sPartnerFinalPath, sDefaultPath) Then Goto ErrorTrap End If
+		If UCase$(sLocalPath) = UCase$(sPartnerFinalPath) Or PathIsWithin(sLocalPath, sPartnerFinalPath) Or PathIsWithin(sPartnerFinalPath, sLocalPath) Then Goto ErrorTrap End If
+
+		Call MyPrint("Moving files from the working folder for partner '" + sLastPartnerName + "' ...")
+		Call MyPrint("Source folder = '" + sLocalPath + "'.")
+		Call MyPrint("Destination folder = '" + sPartnerFinalPath + "'.")
+		sQ = Chr$(34)
+		' Call Robocopy directly so shell metacharacters in paths stay literal.
+		sCmd = "robocopy.exe " + sQ + sLocalPath + sQ + " " + sQ + sPartnerFinalPath + sQ + " /MOVE /E /R:3 /W:2 /IS /IT /IM"
+		iResult = ExecuteAndWait(sCmd)
+		If iResult < 0 Or iResult >= 8 Then
+			Call MyPrint("ERROR: Robocopy failed moving files to the output folder.")
+			Call MyPrint("Robocopy exit code = " + Str$(iResult))
+			Goto ErrorTrap
+		End If
+		Call MyPrint("Move complete.")
+	End If
+
+	bPartnerPending = False
+	Call MyPrint("Processing for partner complete.")
+	Call MyPrint("----------------------------------------------------------------------")
+	Call MyPrint("")
+	CompletePartner = True
+	Exit Function
+
+ErrorTrap:
+	iErrorCount = iErrorCount + 1
+	Call MyPrint("Error completing partner '" + sLastPartnerName + "'. Process stopped.")
+	Call MyPrint("Check remaining outputs in '" + sLocalPath + "'.")
+	If sWorkingRoot <> "" Then Call MyPrint("Working run folder retained at '" + sWorkingRoot + "'.") End If
+
 End Function
 
 Sub ProcessExtracts
@@ -1903,6 +2244,7 @@ Sub ProcessExtracts
 	' Set the main output sub-folder
 	'-------------------------------------------------
 	Dim sOutputFolder As String
+	Dim iSuccess As Integer
 	If sPartnerFolder = "" Then
 		sOutputFolder = sShortName
 	Else
@@ -1912,14 +2254,7 @@ Sub ProcessExtracts
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
-	sOutputFolder = StringReplace(sOutputFolder, "%partner%", sShortName)
-	sOutputFolder = StringReplace(sOutputFolder, "%dd%", sDateDD)
-	sOutputFolder = StringReplace(sOutputFolder, "%mm%", sDateMM)
-	sOutputFolder = StringReplace(sOutputFolder, "%mmm%", sDateMMM)
-	sOutputFolder = StringReplace(sOutputFolder, "%yy%", sDateYY)
-	sOutputFolder = StringReplace(sOutputFolder, "%qq%", sDateQQ)
-	sOutputFolder = StringReplace(sOutputFolder, "%yyyy%", sDateYYYY)
-	sOutputFolder = StringReplace(sOutputFolder, "%ffff%", sDateFFFF)
+	sOutputFolder = ExpandOutputVariables(sOutputFolder, sShortName)
 
 	'-------------------------------------------------
 	' If this is a new partner or a different SQL table ...
@@ -1929,6 +2264,11 @@ Sub ProcessExtracts
 	' If this is a new partner ...
 	'-------------------------------------------------
 	If sPartnerName <> sLastPartnerName Then
+
+		If Not CompletePartner() Then
+			bProcessingStopped = True
+			Goto CleanUp
+		End If
 
 		'-------------------------------------------------
 		' Cleanup after the last partner
@@ -1943,6 +2283,7 @@ Sub ProcessExtracts
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Unable to connect to SQL Server!")
 				sLastSQLTable = ""
+				bProcessingStopped = True
 				Goto CleanUp
 			End If 
 		
@@ -1964,48 +2305,23 @@ Sub ProcessExtracts
 	
 		End If
 	
-		'-------------------------------------------------
-		' Delete the MapInfo output folder if it is empty
-		'-------------------------------------------------
-		If (UCase$(sLastFormat) <> "TAB" And UCase$(sLastFormat) <> "BOTH") And sLastFormat <> "" Then
-			If bDebug Then
-				Call MyPrint("Last Format = '" + sLastFormat + "'.")
-				Call MyPrint("Removing empty output path '" + sLastMapInfoPath + "'.")
-			End If
-			Dim iSuccess As Integer
-			iSuccess = RemoveDirectory(sLastMapInfoPath)
-			if iSuccess <> 1 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Removing empty output path")
-			End If
-		End If
-		
-		If iExtractCnt <> 1 Then
-
-			'-------------------------------------------------
-			' Zip up all the extract files for the last
-			' partner if required
-			'-------------------------------------------------
-			If bZipFiles Then
-				If ZipFiles(sDefaultPath, sOutputFolder) > 1 Then
-					iErrorCount = iErrorCount + 1
-					Call MyPrint("Error: Zipping extract files for partner.")
-				End If
-			End If
-	
-			Call MyPrint("Processing for partner complete.")
-			Call MyPrint("----------------------------------------------------------------------")
-			Call MyPrint("")
-
-		End If
-
 		Call MyPrint("----------------------------------------------------------------------")
 		Call MyPrint("Processing partner '" + sPartnerName + " (" + sShortName + ")' ...")
 
 		'-------------------------------------------------
-		' Set the local path
+		' Set the active partner paths
 		'-------------------------------------------------
-		sLocalPath = sDefaultPath + "\" + sOutputFolder
+		sPartnerOutputFolder = sOutputFolder
+		sLocalPath = FullPath(sOutputRoot + "\" + sPartnerOutputFolder)
+		sPartnerFinalPath = FullPath(sDefaultPath + "\" + sPartnerOutputFolder)
+
+		' Both paths must remain inside their configured output roots.
+		If Not PathIsWithin(sLocalPath, sOutputRoot) Or Not PathIsWithin(sPartnerFinalPath, sDefaultPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Partner folder must be a sub-folder of the output root.")
+			bProcessingStopped = True
+			Goto CleanUp
+		End If
 	
 		'-------------------------------------------------
 		' Create the partner directory path if it doesn't
@@ -2014,17 +2330,11 @@ Sub ProcessExtracts
 		Dim iSecurity As Integer
 		iSecurity = 0
 
-		iSuccess = SetCurrentDirectory(sLocalPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sLocalPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sLocalPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Goto CleanUp
-			End If
+		If Not CreatePath(sLocalPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			bProcessingStopped = True
+			Goto CleanUp
 		End If
 
 		'-------------------------------------------------
@@ -2054,23 +2364,18 @@ Sub ProcessExtracts
 		'-------------------------------------------------
 		' Create the output path if it doesn't exist
 		'-------------------------------------------------
-		iSuccess = SetCurrentDirectory(sMapInfoPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sMapInfoPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sMapInfoPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Goto CleanUp
-			End If
+		If Not CreatePath(sMapInfoPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			bProcessingStopped = True
+			Goto CleanUp
 		End If
 	
 		' Save the last partner details
 		sLastPartnerName = sPartnerName
 		sLastFormat = sFormat
 		sLastMapInfoPath = sMapInfoPath
+		bPartnerPending = True
 
 		'-------------------------------------------------
 		' Check the partner requires some SQL files
@@ -2120,6 +2425,7 @@ Sub ProcessExtracts
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Unable to connect to SQL Server!")
 				sLastSQLTable = ""
+				bProcessingStopped = True
 				Goto CleanUp
 			End If
 
@@ -2196,41 +2502,20 @@ Sub ProcessExtracts
 	Call MyPrint("Completed process " + iExtractCnt + " of " + iExtractTot + ".")
 	Call MyPrint("")
 
-	If iExtractCnt = iExtractTot Then
-
-		'-------------------------------------------------
-		' Delete the MapInfo output folder if it is empty
-		'-------------------------------------------------
-		If (UCase$(sFormat) <> "TAB" And UCase$(sFormat) <> "BOTH") Then
-			If bDebug Then
-				Call MyPrint("Format = '" + sFormat + "'.")
-				Call MyPrint("Removing empty output path '" + sMapInfoPath + "'.")
-			End If
-			iSuccess = RemoveDirectory(sMapInfoPath)
-			if iSuccess <> 1 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Removing empty output path")
-			End If
-		End If
-		
-		'-------------------------------------------------
-		' Zip up all the extract files for the last
-		' partner if required
-		'-------------------------------------------------
-		If bZipFiles Then
-			If ZipFiles(sDefaultPath, sOutputFolder) > 1 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Zipping extract files for partner.")
-			End If
-		End If
-
-		Call MyPrint("Processing for partner complete.")
-		Call MyPrint("----------------------------------------------------------------------")
-		Call MyPrint("")
-
-	End If
-	
 NextExtract:
+	' Finish each partner before the next progress-bar callback can be cancelled.
+	Dim bPartnerFinished As Logical
+	bPartnerFinished = iExtractCnt = iExtractTot
+	If Not bPartnerFinished Then
+		bPartnerFinished = ProcessSelected(iExtractCnt + 1).Partner <> sLastPartnerName
+	End If
+	If bPartnerFinished Then
+		If Not CompletePartner() Then
+			bProcessingStopped = True
+			Goto CleanUp
+		End If
+	End If
+
 	'-------------------------------------------------
 	' Increment the progress bar to show progress
 	'-------------------------------------------------
@@ -2260,6 +2545,9 @@ CleanUp:
 			If nConn = 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Unable to connect to SQL Server!")
+				bProcessingStopped = True
+				iExtractCnt = iExtractTot + 1
+				ProgressBar = -1
 				Exit Sub
 			End If 
 		
@@ -2302,6 +2590,7 @@ ErrorTrap:
 		iErrorCount = iErrorCount + 1
 		Call MyPrint("Error: " + str$(Err()) + " - " + Error$())
 	End If
+	bProcessingStopped = True
 	iExtractCnt = iExtractTot
 	ProgressBar = -1
 
@@ -2392,14 +2681,7 @@ Sub SelectSQL (sPartnerName As String,
 	'-------------------------------------------------
 	Dim sLocalTable as String
 	sLocalTable = sOutputName
-	sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
-	sLocalTable = StringReplace(sLocalTable, "%dd%", sDateDD)
-	sLocalTable = StringReplace(sLocalTable, "%mm%", sDateMM)
-	sLocalTable = StringReplace(sLocalTable, "%mmm%", sDateMMM)
-	sLocalTable = StringReplace(sLocalTable, "%yy%", sDateYY)
-	sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
-	sLocalTable = StringReplace(sLocalTable, "%qq%", sDateQQ)
-	sLocalTable = StringReplace(sLocalTable, "%ffff%", sDateFFFF)
+	sLocalTable = ExpandOutputVariables(sLocalTable, sShortName)
 
 	Dim iWaitCount As Integer
 	iWaitCount = 0
@@ -2770,18 +3052,11 @@ ExportTable:
 		Dim iSuccess, iSecurity As Integer
 		iSecurity = 0
 	
-		iSuccess = SetCurrentDirectory(sCSVPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sCSVPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sCSVPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
-			End If
+		If Not CreatePath(sCSVPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			Call MyPrint("Process terminated.")
+			Exit Sub
 		End If
 	
 		Call MyPrint("Exporting as a CSV file ...")
@@ -2810,13 +3085,14 @@ ExportTable:
 				+ " " + Chr$(34) + sSQLMacroParm + Chr$(34)
 				+ " " + Chr$(34) + sCSVPath + Chr$(34)
 				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
-				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+				+ " " + Chr$(34) + sMacroLogFile + Chr$(34)
 
 			Dim intRC As Integer
 			intRC = ExecuteAndWait(sCmd)
+            Call ImportMacroLog
 			If intRC > 1 Then
 				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
-			ElseIf intRC > 0 Then
+			ElseIf intRC <> 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
 			End if
@@ -2829,18 +3105,11 @@ ExportTable:
 		'-------------------------------------------------
 		' Create the output path if it doesn't exist
 		'-------------------------------------------------
-		iSuccess = SetCurrentDirectory(sTXTPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sTXTPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sTXTPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
-			End If
+		If Not CreatePath(sTXTPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			Call MyPrint("Process terminated.")
+			Exit Sub
 		End If
 	
 		Call MyPrint("Exporting as a TXT file ...")
@@ -2868,12 +3137,13 @@ ExportTable:
 				+ " " + Chr$(34) + sSQLMacroParm + Chr$(34)
 				+ " " + Chr$(34) + sTXTPath + Chr$(34)
 				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
-				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+				+ " " + Chr$(34) + sMacroLogFile + Chr$(34)
 
 			intRC = ExecuteAndWait(sCmd)
+            Call ImportMacroLog
 			If intRC > 1 Then
 				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
-			ElseIf intRC > 0 Then
+			ElseIf intRC <> 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
 			End if
@@ -2890,7 +3160,7 @@ ExportTable:
 	'-------------------------------------------------
 	If UCase$(sOutputType) = "SHP" Or UCase$(sOutputType) = "BOTH" Then
 		Dim sLogFilePath As String, sLogFileShp As String
-		sLogFilePath = PathToDirectory$(sLogFileName)
+		sLogFilePath = sSupportPath
 		sLogFileShp = "TabToShp" + "_" + sUserID
 		
 		Dim sInputPath As String
@@ -2898,18 +3168,11 @@ ExportTable:
 		'-------------------------------------------------
 		' Create the output path if it doesn't exist
 		'-------------------------------------------------
-		iSuccess = SetCurrentDirectory(sArcGISPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sArcGISPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sArcGISPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
-			End If
+		If Not CreatePath(sArcGISPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			Call MyPrint("Process terminated.")
+			Exit Sub
 		End If
 
 		'-------------------------------------------------
@@ -2956,14 +3219,16 @@ ExportTable:
 				' Turn FastEdit off once updates are done
 				'-------------------------------------------------
 				Set Table sTableAlias FastEdit Off
-
-				If bDebug Then
-					Call MyPrint("Closing the MapInfo table ...")
-				End If
-				Close Table sTableAlias
-
 			End If
 
+		End If
+
+		If TableIsOpen(sTableAlias) Then
+			If bDebug Then
+				Call MyPrint("Closing the MapInfo table ...")
+			End If
+			Commit Table sTableAlias
+			Close Table sTableAlias
 		End If
 	Else
 		'-------------------------------------------------
@@ -3368,14 +3633,7 @@ Sub SelectMaps (sPartnerName As String,
 	'-------------------------------------------------
 	' Replace any variables
 	'-------------------------------------------------
-	sLocalTable = StringReplace(sLocalTable, "%partner%", sShortName)
-	sLocalTable = StringReplace(sLocalTable, "%dd%", sDateDD)
-	sLocalTable = StringReplace(sLocalTable, "%mm%", sDateMM)
-	sLocalTable = StringReplace(sLocalTable, "%mmm%", sDateMMM)
-	sLocalTable = StringReplace(sLocalTable, "%yy%", sDateYY)
-	sLocalTable = StringReplace(sLocalTable, "%yyyy%", sDateYYYY)
-	sLocalTable = StringReplace(sLocalTable, "%qq%", sDateQQ)
-	sLocalTable = StringReplace(sLocalTable, "%ffff%", sDateFFFF)
+	sLocalTable = ExpandOutputVariables(sLocalTable, sShortName)
 	
 	'-------------------------------------------------
 	' Check if the output name is too long
@@ -3400,23 +3658,33 @@ SelectRecords:
 	OnError Goto SelectError
 
 	'-------------------------------------------------
-	' Check if the partner has a spatial boundary
-	'-------------------------------------------------
-	Dim sCmd As String
-	sCmd = "Select * From " + sPartnerTable + " Where not obj Into " + sTempTable + " NoSelect"
-	Run Command (sCmd)
-	
-	Dim iNonSpatialRecs As Integer
-	iNonSpatialRecs = TableInfo(sTempTable, TAB_INFO_NROWS)
-	
-	If iNonSpatialRecs > 0 Then
-		Call MyPrint("Partner boundary is non-spatial.")
-		If TableIsOpen(sTempTable) Then
-			Close Table sTempTable
-		End If
-	End If
-	
-	If iNonSpatialRecs = 0 Then
+    ' Check only the selected partner. Other partners must never change
+    ' this extract from spatial to unrestricted attribute selection.
+    '-------------------------------------------------
+    Dim sCmd As String, sPartnerFilter As String
+    Dim iPartnerRecs As Integer, iSpatialRecs As Integer
+    sPartnerFilter = "Str$(" + sPartnerColumn + ") = " + Chr$(34) + sPartnerName + Chr$(34)
+    sCmd = "Select * From " + sPartnerTable + " Where " + sPartnerFilter + " Into " + sTempTable + " NoSelect"
+    Run Command (sCmd)
+    iPartnerRecs = TableInfo(sTempTable, TAB_INFO_NROWS)
+    Close Table sTempTable
+    If iPartnerRecs = 0 Then
+        iErrorCount = iErrorCount + 1
+        Call MyPrint("Error: Selected partner '" + sPartnerName + "' is no longer present in the partner table. MapInfo output skipped.")
+        Exit Sub
+    End If
+
+    sCmd = "Select * From " + sPartnerTable + " Where (" + sPartnerFilter + ") And obj Into " + sTempTable + " NoSelect"
+    Run Command (sCmd)
+    iSpatialRecs = TableInfo(sTempTable, TAB_INFO_NROWS)
+    Close Table sTempTable
+    If iSpatialRecs = 0 Then
+        Call MyPrint("Selected partner '" + sPartnerName + "' is non-spatial; using its configured attribute selection.")
+    ElseIf iSpatialRecs < iPartnerRecs Then
+        Call MyPrint("Ignoring rows without geometry for selected partner '" + sPartnerName + "'; using its spatial boundary rows.")
+    End If
+
+	If iSpatialRecs > 0 Then
 		'-------------------------------------------------
 		' Execute the SQL statement to select the table
 		' records intersecting with the required
@@ -3439,7 +3707,7 @@ SelectRecords:
 			Call MyPrint("Order by clause is ... " + sMapOrderClause)
 		End If
 
-		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where Str$(" + sPartnerColumn + ") = " + Chr$(34) + sPartnerName + Chr$(34) + ") " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
+		sCmd = "Select " + sMapColumns + " From " + sTableName + " Where obj Intersects (Select obj From " + sPartnerTable + " Where (" + sPartnerFilter + ") And obj) " + sMapWhereClause + " " + sMapOrderClause + " Into " + sTempTable + " NoSelect"
 		Run Command (sCmd)
 	Else
 		'-------------------------------------------------
@@ -3560,18 +3828,11 @@ ExportTable:
 		Dim iSuccess, iSecurity As Integer
 		iSecurity = 0
 	
-		iSuccess = SetCurrentDirectory(sCSVPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sCSVPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sCSVPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
-			End If
+		If Not CreatePath(sCSVPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			Call MyPrint("Process terminated.")
+			Exit Sub
 		End If
 	
 		Call MyPrint("Exporting as a CSV file ...")
@@ -3600,13 +3861,14 @@ ExportTable:
 				+ " " + Chr$(34) + sMapMacroParm + Chr$(34)
 				+ " " + Chr$(34) + sCSVPath + Chr$(34)
 				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
-				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+				+ " " + Chr$(34) + sMacroLogFile + Chr$(34)
 
 			Dim intRC As Integer
 			intRC = ExecuteAndWait(sCmd)
+            Call ImportMacroLog
 			If intRC > 1 Then
 				Call MyPrint("Error: Problem processing the export file. RC = " + intRC)
-			ElseIf intRC > 0 Then
+			ElseIf intRC <> 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
 			End if
@@ -3619,18 +3881,11 @@ ExportTable:
 		'-------------------------------------------------
 		' Create the output path if it doesn't exist
 		'-------------------------------------------------
-		iSuccess = SetCurrentDirectory(sTXTPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sTXTPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sTXTPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
-			End If
+		If Not CreatePath(sTXTPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			Call MyPrint("Process terminated.")
+			Exit Sub
 		End If
 	
 		Call MyPrint("Exporting as a TXT file ...")
@@ -3658,12 +3913,13 @@ ExportTable:
 				+ " " + Chr$(34) + sMapMacroParm + Chr$(34)
 				+ " " + Chr$(34) + sTXTPath + Chr$(34)
 				+ " " + Chr$(34) + sLocalTable + "." + sExportType + Chr$(34)
-				+ " " + Chr$(34) + sLogFileName + Chr$(34)
+				+ " " + Chr$(34) + sMacroLogFile + Chr$(34)
 
 			intRC = ExecuteAndWait(sCmd)
+            Call ImportMacroLog
 			If intRC > 1 Then
 				Call MyPrint("Error: Problem processing the export file. RC = " + intRC)
-			ElseIf intRC > 0 Then
+			ElseIf intRC <> 0 Then
 				iErrorCount = iErrorCount + 1
 				Call MyPrint("Error: Problems processing the export file. RC = " + intRC)
 			End if
@@ -3680,24 +3936,17 @@ ExportTable:
 	'-------------------------------------------------
 	If UCase$(sFormatType) = "SHP" Or UCase$(sFormatType) = "BOTH" Then
 		Dim sLogFilePath As String, sLogFileShp As String
-		sLogFilePath = PathToDirectory$(sLogFileName)
+		sLogFilePath = sSupportPath
 		sLogFileShp = "TabToShp" + "_" + sUserID
 
 		'-------------------------------------------------
 		' Create the output path if it doesn't exist
 		'-------------------------------------------------
-		iSuccess = SetCurrentDirectory(sArcGISPath)
-		if iSuccess = 0 Then
-			If bDebug Then
-				Call MyPrint("Creating output path '" + sArcGISPath + "'.")
-			End If
-			iSuccess = SHCreateDirectoryEx(0, sArcGISPath, iSecurity)
-			if iSuccess <> 0 Then
-				iErrorCount = iErrorCount + 1
-				Call MyPrint("Error: Creating directory path")
-				Call MyPrint("Process terminated.")
-				Exit Sub
-			End If
+		If Not CreatePath(sArcGISPath) Then
+			iErrorCount = iErrorCount + 1
+			Call MyPrint("Error: Creating directory path")
+			Call MyPrint("Process terminated.")
+			Exit Sub
 		End If
 
 		'-------------------------------------------------
@@ -3839,64 +4088,119 @@ Sub AboutBox
 
 End Sub
 
+Function WriteLogLine(ByVal sPath As String, ByVal sMessage As String) As Logical
+    OnError Goto Failed
+    Dim bOpened As Logical
+    WriteLogLine = False
+    If sPath = "" Then Exit Function End If
+    Open File sPath For Append As #91
+    bOpened = True
+    Print #91, sMessage
+    Close File #91
+    bOpened = False
+    WriteLogLine = True
+    Exit Function
+Failed:
+    If bOpened Then Close File #91 End If
+End Function
+
 Sub MyPrint(ByVal sMsg As String)
-'***************************************************************
-'* Bespoke print function
-'***************************************************************
+    Dim sMessage As String, bWritten As Logical
+    sMessage = FormatDate$(CurDate()) + " " + FormatTime$(CurTime(), "HH:mm:ss") + " : " + sMsg
+    If bLogBuffered Then
+        iLogCount = iLogCount + 1
+        If iLogCount > UBound(sLogMessages) Then ReDim sLogMessages(iLogCount + 100) End If
+        sLogMessages(iLogCount) = sMessage
+        If sLogFileTmp = "" Then Exit Sub End If
+        bWritten = WriteLogLine(sLogFileTmp, sMessage)
+    Else
+        bWritten = WriteLogLine(sLogFileName, sMessage)
+    End If
+    If Not bWritten Then
+        If Not bLogWarning Then
+            bLogWarning = True
+            Open Window Message
+            Print "Unable to write the log. Run messages remain in memory while processing."
+        End If
+        Print sMessage
+    End If
+End Sub
 
-	Dim iWaitCount As Integer
-	iWaitCount = 0
+Sub ImportMacroLog()
+    OnError Goto Failed
+    Dim sLine As String, iLine As Integer, bOpened As Logical
+    If Not FileExists(sMacroLogFile) Then Exit Sub End If
+    Open File sMacroLogFile For Input As #92
+    bOpened = True
+    Do While Not EOF(92)
+        Line Input #92, sLine
+        iLine = iLine + 1
+        If iLine > iMacroLogLines Then
+            Call MyPrint("Macro: " + sLine)
+            iMacroLogLines = iLine
+        End If
+    Loop
+    Close File #92
+    bOpened = False
+    Exit Sub
+Failed:
+    If bOpened Then Close File #92 End If
+    iErrorCount = iErrorCount + 1
+    Call MyPrint("Unable to read export macro log '" + sMacroLogFile + "'.")
+End Sub
 
-	'-------------------------------------------------
-	' Trap any print errors
-	'-------------------------------------------------
-	OnError Goto OpenError
+Sub CommitLogMessages()
+    OnError Goto Failed
+    Dim iMessage As Integer, bOpened As Logical
+    If Not bLogBuffered Or iLogCount = 0 Then Exit Sub End If
+    If Not CreatePath(sLogFilePath) Then Goto Failed End If
+    Open File sLogFileName For Append As #93
+    bOpened = True
+    For iMessage = 1 To iLogCount
+        Print #93, sLogMessages(iMessage)
+    Next
+    Close File #93
+    bOpened = False
+    iLogCount = 0
+    ReDim sLogMessages(100)
+    bLogBuffered = False
+    Exit Sub
+Failed:
+    If bOpened Then Close File #93 End If
+    iErrorCount = iErrorCount + 1
+    Note "Unable to append the final log. Messages remain in memory and the temporary log is at:" + Chr$(10) + sLogFileTmp
+End Sub
 
-OpenLog:
-	'-------------------------------------------------
-	' Open the log file for output
-	'-------------------------------------------------
-	Open File sLogFileName For Append As #1
-
-	'-------------------------------------------------
-	' Write the message passed to the output file
-	'-------------------------------------------------
-	Print #1, FormatDate$(CurDate()) + " " + FormatTime$(CurTime(),"H:mm:ss") + " : " + sMsg
-
-	'-------------------------------------------------
-	' Close the output file
-	'-------------------------------------------------
-	Close File #1
-
-ExitSub:
-
-	Exit Sub
-
-OpenError:
-
-	'-------------------------------------------------
-	' Exit if we've already waited 5 seconds
-	'-------------------------------------------------
-	If iWaitCount > 5 Then
-		iErrorCount = iErrorCount + 1
-		Note str$(Err()) + ": " + Error$()
-		Goto ExitSub
-	End If
-
-	'-------------------------------------------------
-	' If this is a file access error then wait 
-	' for 1 second and then try again
-	'-------------------------------------------------
-	If Left$(Error$(), 18) = "Cannot access file" Then
-		Call Wait(1)
-		iWaitCount = iWaitCount + 1
-		Resume OpenLog
-	Else
-		iErrorCount = iErrorCount + 1
-		Note str$(Err()) + ": " + Error$()
-		Goto ExitSub
-	End If
-
+Sub FinishRunLog()
+    OnError Goto Failed
+    Dim sCommand As String, sQ As String, sTarget As String
+    Dim iResult As Integer
+    If sWorkingRoot <> "" Then
+        Call MyPrint("Moving run logs and translator diagnostics to '" + sLogFilePath + "' ...")
+        sQ = Chr$(34)
+        ' Only move top-level diagnostics; unfinished partner folders stay local.
+        sCommand = "robocopy.exe " + sQ + sWorkingRoot + sQ + " " + sQ + sLogFilePath + sQ + " *.log *.fme /MOV /R:3 /W:2 /IS /IT /IM"
+        iResult = ExecuteAndWait(sCommand)
+        sTarget = sLogFilePath + "\" + sLogFileTmpName
+        If Not FileExists(sLogFileTmp) And FileExists(sTarget) Then sLogFileTmp = sTarget End If
+        If iResult < 0 Or iResult >= 8 Then
+            iErrorCount = iErrorCount + 1
+            Call MyPrint("Error moving run diagnostics. Robocopy exit code = " + Str$(iResult))
+            Call MyPrint("Remaining diagnostics retained in '" + sWorkingRoot + "'.")
+        Else
+            Call MyPrint("Run diagnostics move complete.")
+        End If
+        ' Safe cleanup: this cannot remove non-empty folders or partner outputs.
+        sTarget = ApplicationDirectory$()
+        iResult = SetCurrentDirectory(sTarget)
+        iResult = RemoveDirectory(sWorkingRoot)
+    End If
+    Call CommitLogMessages
+    Exit Sub
+Failed:
+    iErrorCount = iErrorCount + 1
+    Call MyPrint("Error publishing run diagnostics. Check '" + sWorkingRoot + "'.")
+    Call CommitLogMessages
 End Sub
 
 Sub PrintLogFile()

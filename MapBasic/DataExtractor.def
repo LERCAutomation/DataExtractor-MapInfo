@@ -19,13 +19,13 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor.def v1.08
+'* DataExtractor.def v1.09
 '*
 '* Defines global variables and declares subroutines and functions.
 '*
 '*
 '* Created:			Andy Foy - November 2013
-'* Last revised:	Andy Foy - May 2019
+'* Last revised:	Andy Foy - October 2026
 '***************************************************************
 
 Include "MapBasic.def"
@@ -43,6 +43,15 @@ Include "Windows32.def"
 '-------------------------------------------------
 ' Define the custom variable types
 '-------------------------------------------------
+Type ZIP_ENTRY
+    Name As String
+    IsDirectory As Logical
+    SizeHigh As Integer
+    SizeLow As Integer
+    ModifiedHigh As Integer
+    ModifiedLow As Integer
+End Type
+
 Type STARTUPINFO
 	cb As Integer
 	lpReserved As String
@@ -198,10 +207,24 @@ Declare Sub SelectMaps
 	sMapMacroParm As String)
 Declare Sub AboutBox
 Declare Sub egsit
+Declare Function WriteLogLine
+    (ByVal sPath As String, ByVal sMessage As String) As Logical
+Declare Sub ImportMacroLog
+Declare Sub CommitLogMessages
+Declare Sub FinishRunLog
 Declare Sub MyPrint
 	(ByVal sMsg As String)
 Declare Sub PrintLogFile
 Declare Sub ProcessExtracts
+Declare Function FullPath
+	(ByVal sPath As String) As String
+Declare Function PathIsWithin
+	(ByVal sPath As String, ByVal sRoot As String) As Logical
+Declare Function ExpandOutputVariables
+    (ByVal sValue As String, ByVal sShortName As String) As String
+Declare Function ValidateOutputNames() As Logical
+Declare Function PrepareWorkingDirectory() As Logical
+Declare Function CompletePartner() As Logical
 Declare Sub SetUTDirectory
 	(ByVal sPath as string)
 Declare Sub AmendVersion
@@ -246,8 +269,33 @@ Declare Function GetRowLength
 Declare Function ColumnExists
 	(ByVal sTableName As String,
 	ByVal sColName As String) As Logical
+Declare Function NewWorkingFolder
+    (ByVal sRoot As String, ByVal sPrefix As String) As String
+Declare Function GetFileAttributes Lib "kernel32" Alias "GetFileAttributesA"
+    (ByVal lpFileName As String) As Integer
+Declare Function CreatePath
+    (ByVal sPath As String) As Logical
 Declare Function ExecuteAndWait
 	(ByVal cmdLine as string) As Integer
+Declare Function WindowsZipTool
+    (ByVal sName As String) As String
+Declare Function InitZipTools() As Logical
+Declare Function ZipExcludePattern
+    (ByVal sName As String) As String
+Declare Function IsZipArchive
+    (ByVal sPath As String) As Logical
+Declare Function SnapshotZipFolder
+    (ByVal sRoot As String, ByVal sRelative As String,
+    ByVal sExcluded As String, entries() As ZIP_ENTRY, count As Integer) As Logical
+Declare Function ZipEntryUnchanged
+    (ByVal sRoot As String, entry As ZIP_ENTRY) As Logical
+Declare Function VerifyZipFolder
+    (ByVal sSource As String, ByVal sRestored As String,
+    ByVal sExcluded As String, entries() As ZIP_ENTRY, ByVal count As Integer) As Logical
+Declare Function ZipLastError Lib "kernel32" Alias "GetLastError" () As Integer
+Declare Function ZipMoveFileEx Lib "kernel32" Alias "MoveFileExA"
+    (ByVal lpExistingFileName As String, ByVal lpNewFileName As String,
+    ByVal dwFlags As Integer) As Integer
 Declare Function ZipFiles
 	(sDefaultPath As String,
 	sShortName As String) As Integer
@@ -281,6 +329,11 @@ Declare Function UploadtoServer(sEasyLoaderCommand As String,
 Declare Function GetFileDateTime(ByVal FileName As String,
         ByVal NoGMTConvert As Logical) As String
 
+Declare Function GetFullPathName Lib "kernel32" Alias "GetFullPathNameA"
+	(ByVal lpFileName As String,
+	ByVal nBufferLength As Integer,
+	lpBuffer As String,
+	ByVal lpFilePart As Integer) As Integer
 Declare Function CreateDirectory Lib "kernel32"
 	Alias "CreateDirectoryA"
 	(ByVal sPathName as String,
@@ -423,6 +476,24 @@ Global sDefaultXMLFile As String
 Global iDefaultXMLFile As Integer
 
 Global sDefaultPath As String
+Global sWorkingDir As String
+Global sZipTar As String
+Global sZipCompare As String
+Global sSupportPath As String
+Global sLogFileTmp As String
+Global sLogFileTmpName As String
+Global sMacroLogFile As String
+Global iMacroLogLines As Integer
+Global sLogMessages() As String
+Global iLogCount As Integer
+Global bLogBuffered As Logical
+Global bLogWarning As Logical
+Global sWorkingRoot As String
+Global sOutputRoot As String
+Global sPartnerOutputFolder As String
+Global sPartnerFinalPath As String
+Global bPartnerPending As Logical
+Global bProcessingStopped As Logical
 Global sPartnerFolder As String
 Global sMapInfoFolder As String
 Global sArcGISFolder As String

@@ -50,6 +50,10 @@ Type WIN32_FIND_DATA Align4
    cAlternate As String * 14
 End Type
 
+Type ZIP_NATIVE_HANDLE
+    Value As IntPtr
+End Type
+
 '-------------------------------------------------
 ' Declare the subroutines
 '-------------------------------------------------

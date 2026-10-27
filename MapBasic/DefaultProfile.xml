@@ -43,6 +43,13 @@ used by the MapBasic tool to select and export data for partners.
 	<value>D:\LRCs\GiGL\Data Exchange\Extracts</value>
   </DefaultPath>
 
+  <!-- Optional local staging folder, for example C:\DataExtractor\Working.
+       Missing or blank preserves direct output to DefaultPath.
+       Each run uses a fresh sub-folder; each partner is moved after processing. -->
+  <WorkingDir>
+	<value></value>
+  </WorkingDir>
+
   <!-- The output sub-folder in which each partner's file will be created -->
   <PartnerFolder>
 	<value>%partner%_DataExchange_%qq%_%ffff%</value>
@@ -261,7 +268,7 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</AllSppShort>
+	</AllSppPoint>
 	<DesignatedSpp>
 		<OutputName>
 			<Value>Species_Designated_%partner%</Value>
@@ -541,7 +548,7 @@ used by the MapBasic tool to select and export data for partners.
 				</Symbol>
 			</Symbol>
 		</Symbology>
-	</GiGL_OtherSpp>
+	</OtherSpp>
 	<HistoricSpp>
 		<OutputName>
 			<Value>Species_Historic_%partner%</Value>

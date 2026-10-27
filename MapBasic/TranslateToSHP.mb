@@ -136,7 +136,7 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 		Call MyPrint("Creating Universal Translator mapping file ...")
 	End If
 
-	If ExecuteAndWait(sMUTGenerate) > 0 then
+	If ExecuteAndWait(sMUTGenerate) <> 0 then
 		Call MyPrint("Error creating Mapping file - process terminated.")
 		Call MyPrint("")
 		Exit Sub
@@ -180,7 +180,7 @@ Sub TranslateToShapefile(sUTPath As String, sUTCommand As String, sDefaultPath A
 			Call MyPrint("Executing Universal Translator ...")
 		End If
 
-		If ExecuteAndWait(sMUTRunCmd) > 0 then
+		If ExecuteAndWait(sMUTRunCmd) <> 0 then
 			Call MyPrint("Error translating to SHP file - process terminated.")
 			Call MyPrint("")
 			Exit Sub

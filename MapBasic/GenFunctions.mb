@@ -21,14 +21,19 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* GenFunctions v1.43
+'* GenFunctions v1.44
 '*
 '* Contains general functions used by the DataExtractor tool.
 '*
 '*
 '* Created:			Andy Foy - February 2013
-'* Last revised:	Andy Foy - May 2019
+'* Last revised:	Andy Foy - October 2026
 '* 
+'* *****************  Version 1.44  *****************
+'* A. Detect failed process launches and close both handles.
+'* B. Verify ZIP contents before removing source files.
+'* C. Add directory creation and fresh-run helpers.
+'*
 '* *****************  Version 1.43  *****************
 '* Author: Andy Foy		Date: 28/05/2019
 '* A. Added function to get a list of files from a directory.
@@ -108,114 +113,376 @@ Function ColumnExists(ByVal sTableName As String, ByVal sColName As String) As L
 
 End Function
 
-Function ExecuteAndWait(ByVal cmdLine as string) As Integer
+Function ExecuteAndWait(ByVal cmdLine As String) As Integer
 '*************************************************
-'* Execute a command and wait for it to finish
+'* Execute a command and wait for it to finish.
+'* Returns the process exit code, or -1 if the
+'* process itself could not be executed/queried.
 '*************************************************
 
 	OnError Goto ErrorHandle
 
-	Dim nRetVal As Integer, nExitCode As Integer
-	Dim NameOfProc As Process_Information, NameStart As StartUpInfo
+	Dim nRetVal As Integer
+	Dim nResult As Integer
+	Dim nExitCode As Integer
+	Dim NameOfProc As PROCESS_INFORMATION
+	Dim NameStart As STARTUPINFO
 	Dim hProc As Integer
 
 	NameStart.cb = 256
 	NameStart.dwFlags = 1
 	NameStart.wShowWindow = 0
 
-	' Start the shelled application
-	nRetVal = CreateProcessA(0, cmdLine, 0, 0, 1, NORMAL_PRIORITY_CLASS, 0, 0, NameStart, NameOfProc)
+	'-------------------------------------------------
+	' Start the application
+	'-------------------------------------------------
+	nRetVal = CreateProcessA( 0, cmdLine, 0, 0, 1, NORMAL_PRIORITY_CLASS, 0, 0, NameStart, NameOfProc)
 
-	' Get the handle of the started process
+	If nRetVal = 0 Then
+		ExecuteAndWait = -1
+		Exit Function
+	End If
+
 	hProc = NameOfProc.hProcess
 
-	' Wait for the shelled application process to finish
+	'-------------------------------------------------
+	' Wait for the process to finish
+	'-------------------------------------------------
 	nRetVal = WaitForSingleObject(hProc, INFINITE)
 
-	' Get the exit code from the shelled application
+	If nRetVal = -1 Then
+		nResult = CloseHandle(NameOfProc.hProcess)
+		nResult = CloseHandle(NameOfProc.hThread)
+		ExecuteAndWait = -1
+		Exit Function
+	End If
+
+	'-------------------------------------------------
+	' Retrieve its exit code
+	'-------------------------------------------------
 	nRetVal = GetExitCodeProcess(hProc, nExitCode)
 
-	' Close the process handle
-	nRetVal = CloseHandle(hProc)
+	If nRetVal = 0 Then
+		nResult = CloseHandle(NameOfProc.hProcess)
+		nResult = CloseHandle(NameOfProc.hThread)
+		ExecuteAndWait = -1
+		Exit Function
+	End If
+
+	'-------------------------------------------------
+	' Close both handles returned by CreateProcess
+	'-------------------------------------------------
+	nResult = CloseHandle(NameOfProc.hProcess)
+	nResult = CloseHandle(NameOfProc.hThread)
 
 	ExecuteAndWait = nExitCode
-
-Exit Function
+	Exit Function
 
 ErrorHandle:
-	ExecuteAndWait = FALSE
-	Note str$(Err()) + ": " + Error$()
-	Call MyPrint(str$(Err()) + ": " + Error$())
+
+	ExecuteAndWait = -1
+
+	Note Str$(Err()) + ": " + Error$()
+	Call MyPrint(Str$(Err()) + ": " + Error$())
+
 	Exit Function
 
 End Function
 
+Function WindowsZipTool(ByVal sName As String) As String
+' Use the native system directory, including from 32-bit MapInfo on 64-bit Windows.
+    Dim sWindows As String, sCandidate As String
+    WindowsZipTool = ""
+    sWindows = FullPath(Env$("WINDIR"))
+    If sWindows = "" Then Exit Function End If
+    sCandidate = sWindows + "\Sysnative\" + sName
+    If FileExists(sCandidate) Then
+        WindowsZipTool = sCandidate
+        Exit Function
+    End If
+    sCandidate = sWindows + "\System32\" + sName
+    If FileExists(sCandidate) Then WindowsZipTool = sCandidate End If
+End Function
+
+Function InitZipTools() As Logical
+    Dim sQ As String, iResult As Integer
+    InitZipTools = False
+    sQ = Chr$(34)
+    sZipTar = WindowsZipTool("tar.exe")
+    sZipCompare = WindowsZipTool("fc.exe")
+    If sZipTar = "" Or sZipCompare = "" Then
+        Call MyPrint("ZIP creation requires Windows tar.exe and fc.exe. No source files have been removed.")
+        Exit Function
+    End If
+    iResult = ExecuteAndWait(sQ + sZipTar + sQ + " --version")
+    If iResult <> 0 Then
+        Call MyPrint("Unable to run Windows tar.exe. Exit code = " + Str$(iResult))
+        Exit Function
+    End If
+    iResult = ExecuteAndWait(sQ + sZipCompare + sQ + " /?")
+    If iResult <> 0 Then
+        Call MyPrint("Unable to run Windows fc.exe. Exit code = " + Str$(iResult))
+        Exit Function
+    End If
+    InitZipTools = True
+End Function
+
+Function ZipExcludePattern(ByVal sName As String) As String
+' Anchor the exclusion at the root and quote literal pattern metacharacters.
+    Dim i As Integer, sChar As String, sPattern As String
+    sPattern = "^./"
+    For i = 1 To Len(sName)
+        sChar = Mid$(sName, i, 1)
+        Do Case sChar
+            Case "[", "]", "^", "$"
+                sPattern = sPattern + "\" + sChar
+            Case Else
+                sPattern = sPattern + sChar
+        End Case
+    Next
+    ZipExcludePattern = sPattern + "$"
+End Function
+
+Function IsZipArchive(ByVal sPath As String) As Logical
+' Validate the format as well as tar's return code (ZIP local-file header).
+    OnError Goto Failed
+    Dim iSignature As Integer, bOpened As Logical
+    IsZipArchive = False
+    Open File sPath For Binary Access Read As #94 ByteOrder LOWHIGH
+    bOpened = True
+    Get #94, , iSignature
+    Close File #94
+    bOpened = False
+    IsZipArchive = iSignature = 67324752
+    Exit Function
+Failed:
+    If bOpened Then Close File #94 End If
+End Function
+
+Function SnapshotZipFolder(ByVal sRoot As String, ByVal sRelative As String,
+    ByVal sExcluded As String, entries() As ZIP_ENTRY, count As Integer) As Logical
+' Enumerate with local search state: recursion must not overwrite its parent's handle.
+    OnError Goto Failed
+    Dim state As ZIP_NATIVE_HANDLE, data As WIN32_FIND_DATA
+    Dim sName As String, sChild As String, sPath As String
+    Dim iResult As Integer, iError As Integer
+    Dim bOpened As Logical, bDirectory As Logical
+    SnapshotZipFolder = False
+    state.Value = FindFirstFile(sRoot + "\" + sRelative + "*", data)
+    If state.Value = -1 Then
+        iError = ZipLastError()
+        If iError = 2 Then SnapshotZipFolder = True End If
+        Exit Function
+    End If
+    bOpened = True
+    Do
+        sName = RTrim$(data.cFileName)
+        If sName <> "." And sName <> ".." Then
+            sChild = sRelative + sName
+            sPath = sRoot + "\" + sChild
+            bDirectory = (data.dwFileAttributes Mod 32) >= 16
+            If UCase$(sPath) <> UCase$(sExcluded) Or bDirectory Then
+                If (data.dwFileAttributes Mod 2048) >= 1024 Then
+                    Call MyPrint("ZIP source contains a link or junction: '" + sPath + "'.")
+                    Goto Failed
+                End If
+                count = count + 1
+                If count > UBound(entries) Then ReDim entries(count + 100) End If
+                entries(count).Name = sChild
+                entries(count).IsDirectory = bDirectory
+                entries(count).SizeHigh = data.nFileSizeHigh
+                entries(count).SizeLow = data.nFileSizeLow
+                entries(count).ModifiedHigh = data.ftLastWriteTime.dwHighDateTime
+                entries(count).ModifiedLow = data.ftLastWriteTime.dwLowDateTime
+                If bDirectory Then
+                    If Not SnapshotZipFolder(sRoot, sChild + "\", sExcluded, entries(), count) Then Goto Failed End If
+                End If
+            End If
+        End If
+        iResult = FindNextFile(state.Value, data)
+        If iResult = 0 Then
+            iError = ZipLastError()
+            If iError <> 18 Then Goto Failed End If
+            Exit Do
+        End If
+    Loop
+    iResult = FindClose(state.Value)
+    bOpened = False
+    SnapshotZipFolder = True
+    Exit Function
+Failed:
+    If bOpened Then iResult = FindClose(state.Value) End If
+End Function
+
+Function ZipEntryUnchanged(ByVal sRoot As String, entry As ZIP_ENTRY) As Logical
+    OnError Goto Failed
+    Dim state As ZIP_NATIVE_HANDLE, data As WIN32_FIND_DATA
+    Dim iResult As Integer, bDirectory As Logical
+    ZipEntryUnchanged = False
+    state.Value = FindFirstFile(sRoot + "\" + entry.Name, data)
+    If state.Value = -1 Then Exit Function End If
+    iResult = FindClose(state.Value)
+    If (data.dwFileAttributes Mod 2048) >= 1024 Then Exit Function End If
+    bDirectory = (data.dwFileAttributes Mod 32) >= 16
+    If bDirectory <> entry.IsDirectory Then Exit Function End If
+    If Not bDirectory Then
+        If data.nFileSizeHigh <> entry.SizeHigh Or data.nFileSizeLow <> entry.SizeLow Then Exit Function End If
+        If data.ftLastWriteTime.dwHighDateTime <> entry.ModifiedHigh Or data.ftLastWriteTime.dwLowDateTime <> entry.ModifiedLow Then Exit Function End If
+    End If
+    ZipEntryUnchanged = True
+Failed:
+End Function
+
+Function VerifyZipFolder(ByVal sSource As String, ByVal sRestored As String,
+    ByVal sExcluded As String, entries() As ZIP_ENTRY, ByVal count As Integer) As Logical
+    OnError Goto Failed
+    Dim currentEntries() As ZIP_ENTRY, restoredEntries() As ZIP_ENTRY
+    Dim iCurrent As Integer, iRestored As Integer, i As Integer, iResult As Integer
+    Dim sCommand As String, sQ As String, iAttributes As Integer
+    VerifyZipFolder = False
+    ReDim currentEntries(100)
+    ReDim restoredEntries(100)
+    If Not SnapshotZipFolder(sSource, "", sExcluded, currentEntries(), iCurrent) Then Exit Function End If
+    If Not SnapshotZipFolder(sRestored, "", "", restoredEntries(), iRestored) Then Exit Function End If
+    If iCurrent <> count Or iRestored <> count Then
+        Call MyPrint("ZIP verification failed: the source or restored inventory changed.")
+        Exit Function
+    End If
+    sQ = Chr$(34)
+    For i = 1 To count
+        If Not ZipEntryUnchanged(sSource, entries(i)) Then
+            Call MyPrint("ZIP source changed: '" + entries(i).Name + "'.")
+            Exit Function
+        End If
+        iAttributes = GetFileAttributes(sRestored + "\" + entries(i).Name)
+        If iAttributes = -1 Then Exit Function End If
+        If ((iAttributes Mod 32) >= 16) <> entries(i).IsDirectory Then Exit Function End If
+        If Not entries(i).IsDirectory Then
+            sCommand = sQ + sZipCompare + sQ + " /b " + sQ + sSource + "\" + entries(i).Name + sQ + " " + sQ + sRestored + "\" + entries(i).Name + sQ
+            iResult = ExecuteAndWait(sCommand)
+            If iResult <> 0 Then
+                Call MyPrint("ZIP byte comparison failed for '" + entries(i).Name + "'. Exit code = " + Str$(iResult))
+                Exit Function
+            End If
+        End If
+    Next
+    ' Catch changes made while the byte comparisons were running.
+    iCurrent = 0
+    If Not SnapshotZipFolder(sSource, "", sExcluded, currentEntries(), iCurrent) Then Exit Function End If
+    If iCurrent <> count Then Exit Function End If
+    For i = 1 To count
+        If Not ZipEntryUnchanged(sSource, entries(i)) Then Exit Function End If
+    Next
+    VerifyZipFolder = True
+Failed:
+End Function
+
 Function ZipFiles(sDefaultPath As String, sShortName As String) As Integer
-'*************************************************
-'* Zip all the files in the specified folder
-'*************************************************
-
-	Call MyPrint("Zipping the extract files ...")
-
-	'-------------------------------------------------
-	' Delete the zip file from the partner's subfolder
-	' if it already exists
-	'-------------------------------------------------
-	If FileExists(sDefaultPath + "\" + sShortName + "\" + sShortName + ".zip") Then
-		Call MyPrint("Deleting the existing zip file ...")
-		Kill sDefaultPath + "\" + sShortName + "\" + sShortName + ".zip"
-	End If
-
-	'-------------------------------------------------
-	' Create the zip command string
-	'-------------------------------------------------
-	Dim sZipCommand as string
-	sZipCommand = "CScript.exe " +
-		chr$(34) + ApplicationDirectory$() + "zip.vbs" + chr$(34) + " " + 
-		chr$(34) + sDefaultPath + "\" + sShortName + chr$(34) + " " + 
-		chr$(34) + sDefaultPath + "\" + sShortName + ".zip" + chr$(34) + " " + 
-		"MOVE"
-
-	'-------------------------------------------------
-	' Execute the command and wait for it to finish
-	'-------------------------------------------------
-	Dim iZipSuccess As Integer
-	iZipSuccess = ExecuteAndWait(sZipCommand)
-	If iZipSuccess = 9 Then
-		Call MyPrint("Error creating zip file - process interupted by user.")
-		ZipFiles = iZipSuccess
-		Exit Sub
-	Else
-		If iZipSuccess = 1 then
-			Call MyPrint("No files to compress - zip process terminated.")
-			ZipFiles = iZipSuccess
-			Exit Sub
-		Else
-			If iZipSuccess > 0 then
-				Call MyPrint("Error creating zip file - process terminated.")
-				ZipFiles = iZipSuccess
-				Exit Sub
-			End if
-		End If
-	End if
-
-	'-------------------------------------------------
-	' Move zip file to the partner's subfolder
-	'-------------------------------------------------
-	Call MyPrint("Moving the zip file ...")
-
-	Dim sOldFile, sNewFile As String
-	sOldFile = sDefaultPath + "\" + sShortName + ".zip"
-	sNewFile = sDefaultPath + "\" + sShortName + "\" + sShortName + ".zip"
-	If MoveFile(sOldFile, sNewFile) = 0 then
-		Call MyPrint("Error moving zip file - process terminated.")
-		Call MyPrint("")
-		ZipFiles = 99
-		Exit Sub
-	End if	
-
-	ZipFiles = 0
-
+' 0: verified and cleaned; 1: empty; 2: failure, with originals/recovery files retained.
+    OnError Goto ZipError
+    Dim entries() As ZIP_ENTRY
+    Dim state As ZIP_NATIVE_HANDLE, data As WIN32_FIND_DATA
+    Dim sExcludedName As String
+    Dim sFolder As String, sZipName As String, sTarget As String, sWork As String
+    Dim sCandidate As String, sRestored As String, sCommand As String, sQ As String
+    Dim iPos As Integer, iResult As Integer, count As Integer, i As Integer
+    Dim iAttributes As Integer, bPublished As Logical
+    ZipFiles = 2
+    If sZipTar = "" Or sZipCompare = "" Then
+        If Not InitZipTools() Then Exit Function End If
+    End If
+    sFolder = FullPath(sDefaultPath + "\" + sShortName)
+    If Not PathIsWithin(sFolder, FullPath(sDefaultPath)) Then Goto Failed End If
+    iAttributes = GetFileAttributes(sFolder)
+    If iAttributes = -1 Then Goto Failed End If
+    If (iAttributes Mod 2048) >= 1024 Then Goto Failed End If
+    sZipName = sFolder
+    iPos = Len(sZipName)
+    Do While iPos > 0
+        If Mid$(sZipName, iPos, 1) = "\" Then Exit Do End If
+        iPos = iPos - 1
+    Loop
+    sZipName = Mid$(sZipName, iPos + 1) + ".zip"
+    sTarget = sFolder + "\" + sZipName
+    sExcludedName = sZipName
+    state.Value = FindFirstFile(sTarget, data)
+    If state.Value <> -1 Then
+        sExcludedName = RTrim$(data.cFileName)
+        iResult = FindClose(state.Value)
+    End If
+    ReDim entries(100)
+    If Not SnapshotZipFolder(sFolder, "", sTarget, entries(), count) Then Goto Failed End If
+    If count = 0 Then
+        Call MyPrint("No files to compress.")
+        ZipFiles = 1
+        Exit Function
+    End If
+    sWork = NewWorkingFolder(sDefaultPath, "DataExtractorZip")
+    If sWork = "" Then Goto Failed End If
+    sCandidate = sWork + "\candidate.zip"
+    sRestored = sWork + "\verified"
+    If Not CreatePath(sRestored) Then Goto Failed End If
+    sQ = Chr$(34)
+    Call MyPrint("Creating ZIP '" + sTarget + "' using Windows tar.exe ...")
+    sCommand = sQ + sZipTar + sQ + " -a -c -f " + sQ + sCandidate + sQ + " --exclude " + sQ + ZipExcludePattern(sExcludedName) + sQ + " -C " + sQ + sFolder + sQ + " ."
+    iResult = ExecuteAndWait(sCommand)
+    If iResult <> 0 Then
+        Call MyPrint("ZIP creation failed. Exit code = " + Str$(iResult))
+        Goto Failed
+    End If
+    If Not IsZipArchive(sCandidate) Then
+        Call MyPrint("Windows tar.exe did not create a valid ZIP file.")
+        Goto Failed
+    End If
+    Call MyPrint("Extracting and verifying ZIP contents ...")
+    sCommand = sQ + sZipTar + sQ + " -x -f " + sQ + sCandidate + sQ + " -C " + sQ + sRestored + sQ
+    iResult = ExecuteAndWait(sCommand)
+    If iResult <> 0 Then
+        Call MyPrint("ZIP verification extraction failed. Exit code = " + Str$(iResult))
+        Goto Failed
+    End If
+    If Not VerifyZipFolder(sFolder, sRestored, sTarget, entries(), count) Then Goto Failed End If
+    ' Same-volume rename: the previous archive stays intact if publication fails.
+    iResult = ZipMoveFileEx(sCandidate, sTarget, 9)
+    If iResult = 0 Then Goto Failed End If
+    bPublished = True
+    For i = 1 To count
+        If Not entries(i).IsDirectory Then
+            If Not ZipEntryUnchanged(sFolder, entries(i)) Then Goto Failed End If
+            Kill sFolder + "\" + entries(i).Name
+        End If
+    Next
+    For i = count To 1 Step -1
+        If entries(i).IsDirectory Then
+            iResult = RemoveDirectory(sFolder + "\" + entries(i).Name)
+            If iResult = 0 Then Goto Failed End If
+        End If
+    Next
+    ' Clean only the exact restored files/directories; never recursively delete a tree.
+    For i = 1 To count
+        If Not entries(i).IsDirectory Then Kill sRestored + "\" + entries(i).Name End If
+    Next
+    For i = count To 1 Step -1
+        If entries(i).IsDirectory Then
+            iResult = RemoveDirectory(sRestored + "\" + entries(i).Name)
+            If iResult = 0 Then Goto Failed End If
+        End If
+    Next
+    iResult = RemoveDirectory(sRestored)
+    If iResult = 0 Then Goto Failed End If
+    iResult = RemoveDirectory(sWork)
+    If iResult = 0 Then Goto Failed End If
+    Call MyPrint("ZIP contents verified byte for byte; source files removed.")
+    ZipFiles = 0
+    Exit Function
+Failed:
+    Call MyPrint("Error creating, verifying or cleaning ZIP '" + sTarget + "'.")
+    If bPublished Then Call MyPrint("The verified ZIP is available; check remaining source files.") End If
+    If sWork <> "" Then Call MyPrint("ZIP recovery files retained in '" + sWork + "'.") End If
+    Exit Function
+ZipError:
+    Call MyPrint("ZIP file operation failed: " + Str$(Err()) + " - " + Error$())
+    Goto Failed
 End Function
 
 Function STLText2Symbol(ByVal sSymbol As String) As Symbol
@@ -645,4 +912,46 @@ Public Function GetFileDateTime(ByVal FileName As String,
 	
 	GetFileDateTime = ResultTime
 
+End Function
+
+
+Function CreatePath(ByVal sPath As String) As Logical
+'*************************************************
+'* Create/check a complete local or UNC directory.
+'* Do not change the application's current directory.
+'*************************************************
+    OnError Goto Failed
+    Dim iResult As Integer, iAttributes As Integer
+    CreatePath = False
+    sPath = FullPath(sPath)
+    If sPath = "" Then Exit Function End If
+    iResult = SHCreateDirectoryEx(0, sPath, 0)
+    If iResult <> 0 And iResult <> 183 Then Exit Function End If
+    iAttributes = GetFileAttributes(sPath)
+    If iAttributes = -1 Then Exit Function End If
+    CreatePath = (iAttributes Mod 32) >= 16
+Failed:
+End Function
+
+Function NewWorkingFolder(ByVal sRoot As String, ByVal sPrefix As String) As String
+'*************************************************
+'* Atomically reserve a fresh run directory.
+'*************************************************
+    OnError Goto Failed
+    Dim sCandidate As String, sStamp As String
+    Dim iAttempt As Integer, iResult As Integer
+    NewWorkingFolder = ""
+    sRoot = FullPath(sRoot)
+    If Not CreatePath(sRoot) Then Exit Function End If
+    sStamp = Format$(Year(CurDate()), "0000") + Format$(Month(CurDate()), "00") + Format$(Day(CurDate()), "00") + "_" + StringReplace(FormatTime$(CurTime(), "HH:mm:ss"), ":", "")
+    For iAttempt = 1 To 100
+        sCandidate = sRoot + "\" + sPrefix + "_" + sStamp + "_" + LTrim$(Str$(Int(Rnd(1) * 1000000))) + "_" + LTrim$(Str$(iAttempt))
+        iResult = SHCreateDirectoryEx(0, sCandidate, 0)
+        If iResult = 0 Then
+            NewWorkingFolder = sCandidate
+            Exit Function
+        End If
+        If iResult <> 183 And iResult <> 80 Then Exit Function End If
+    Next
+Failed:
 End Function

@@ -50,6 +50,10 @@ Type WIN32_FIND_DATA
    cAlternate As String * 14
 End Type
 
+Type ZIP_NATIVE_HANDLE
+    Value As Integer
+End Type
+
 '-------------------------------------------------
 ' Declare the subroutines
 '-------------------------------------------------
