@@ -19,7 +19,7 @@
 '* along with DataExtractor.  If not, see <http://www.gnu.org/licenses/>.
 '*
 '***************************************************************
-'* DataExtractor v1.8.00
+'* DataExtractor v1.8.0
 '*
 '* Creates a dialog window which lists the partners in the
 '* partner GIS table and also the SQL tables and
@@ -30,7 +30,7 @@
 '* Created:         Andy Foy - November 2012
 '* Last revised:    Andy Foy - October 2026
 '*
-'* *****************  Version 1.8.00  ***************
+'* *****************  Version 1.8.0  ****************
 '* A. Stage outputs in optional WorkingDir and move them
 '*    to the destination after each partner.
 '* B. Zip the correct partner folder and close non-spatial

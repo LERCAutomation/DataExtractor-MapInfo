@@ -400,7 +400,7 @@ Function ZipFiles(sDefaultPath As String, sShortName As String) As Integer
         If Mid$(sZipName, iPos, 1) = "\" Then Exit Do End If
         iPos = iPos - 1
     Loop
-    sZipName = Mid$(sZipName, iPos + 1) + ".zip"
+    sZipName = Mid$(sZipName, iPos + 1, 99) + ".zip"
     sTarget = sFolder + "\" + sZipName
     sExcludedName = sZipName
     state.Value = FindFirstFile(sTarget, data)
